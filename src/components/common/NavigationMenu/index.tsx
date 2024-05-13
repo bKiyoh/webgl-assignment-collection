@@ -22,7 +22,7 @@ export function NavigationMenu(props: PageProps) {
   };
 
   const renderSheetCloseButton = (href: string, pageName: string) => (
-    <SheetClose asChild>
+    <SheetClose asChild key={href}>
       <Link
         href={href}
         className="text-muted-foreground hover:text-foreground"
