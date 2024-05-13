@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Header } from "@/components/common/Header";
+import { Footer } from "@/components/common/Footer";
+import { ThemeProvider } from "@/components/theme-provider";
+import { NavigationMenu } from "@/components/common/NavigationMenu";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -11,12 +15,32 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <main className="flex min-h-screen flex-col justify-between p-6 font-mono">
+            <div className="flex justify-start">
+              <NavigationMenu />
+              <div className="invisible md:visible">
+                <Header />
+              </div>
+            </div>
+            <div className="w-full flex justify-center">{children}</div>
+            <div className="flex justify-end">
+              <Footer />
+            </div>
+          </main>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
