@@ -4,15 +4,15 @@ import * as THREE from "@/lib/threeJs/three.module.js";
 
 export default function Page() {
   useEffect(() => {
+    const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl");
     if (wrapper) {
-      const app = new ThreeApp(wrapper);
+      const app = new ThreeApp(wrapper, width, height);
       app.render();
     } else {
       console.error("wrapper element not found");
     }
 
-    // Clean up on unmount
     return () => {
       if (wrapper) {
         while (wrapper.firstChild) {
@@ -29,7 +29,7 @@ export default function Page() {
 class ThreeApp {
   static CAMERA_PARAM = {
     fovy: 60,
-    aspect: window.innerWidth / window.innerHeight,
+    // aspect: window.innerWidth / window.innerHeight,
     near: 0.1,
     far: 10.0,
     position: new THREE.Vector3(0.0, 2.0, 5.0),
@@ -38,29 +38,26 @@ class ThreeApp {
 
   static RENDERER_PARAM = {
     clearColor: 0x666666,
-    width: window.innerWidth - 120,
-    height: window.innerHeight - 120,
+    // width: window.innerWidth - 120,
+    // height: window.innerHeight - 120,
   };
 
   static MATERIAL_PARAM = {
     color: 0x3399ff,
   };
 
-  constructor(wrapper) {
+  constructor(wrapper, width, height) {
     const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
-    this.renderer.setSize(
-      ThreeApp.RENDERER_PARAM.width,
-      ThreeApp.RENDERER_PARAM.height
-    );
+    this.renderer.setSize(width - 120, height - 120);
     wrapper.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(
       ThreeApp.CAMERA_PARAM.fovy,
-      ThreeApp.CAMERA_PARAM.aspect,
+      width / height,
       ThreeApp.CAMERA_PARAM.near,
       ThreeApp.CAMERA_PARAM.far
     );
