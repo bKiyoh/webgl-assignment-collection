@@ -1,7 +1,7 @@
 export const LINK_DATA = [
   {
     root: "/",
-    name: "TOP",
+    name: "Top",
   },
   {
     root: "/vol1",

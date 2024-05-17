@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "WebGL Assigned work",
+  title: "WebGL Assignment Collection",
 };
 
 export default function RootLayout({

@@ -18,40 +18,51 @@ export default function Home() {
       }
     };
   }, []);
-  return <div id="webgl" />;
+  return (
+    <>
+      <div id="webgl" />
+    </>
+  );
 }
 
 class ThreeApp {
+  /**
+   * カメラ定義のための定数
+   * aspectは引数の値を使用する
+   */
   static CAMERA_PARAM = {
     fovy: 60,
     near: 0.1,
     far: 10.0,
-    position: new THREE.Vector3(0.0, 2.0, 5.0),
+    position: new THREE.Vector3(0.0, 0.0, 5.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
-
+  /**
+   * レンダラー定義のための定数
+   * width, heightは引数の値を使用する
+   */
   static RENDERER_PARAM = {
     clearColor: "#0c0a09",
     rendererRatio: 120,
   };
   /**
-   * 平行光源定義のための定数
+   * マテリアル定義のための定数
    */
-  static DIRECTIONAL_LIGHT_PARAM = {
-    color: 0xffffff, // 光の色
-    intensity: 1.0, // 光の強度
-    position: new THREE.Vector3(1.0, 1.0, 1.0), // 光の向き
-  };
-  /**
-   * アンビエントライト定義のための定数 @@@
-   */
-  static AMBIENT_LIGHT_PARAM = {
-    color: 0xffffff, // 光の色
-    intensity: 0.1, // 光の強度
-  };
-
   static MATERIAL_PARAM = {
-    color: 0x6699ff, // マテリアルの色
+    color: 0x808080,
+    wireframe: true,
+    opacity: 0.3,
+    transparent: true,
+  };
+  /*
+   * ジオメトリ定義のための定数
+   */
+  static GEOMETRY_PARAM = {
+    tube: 1,
+    tubularSegments: 64,
+    radialSegments: 8,
+    p: 2,
+    q: 3,
   };
 
   renderer; // レンダラ
@@ -59,6 +70,7 @@ class ThreeApp {
   camera; // カメラ
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // アンビエントライト
+  tube; // チューブメッシュ
   tubularSegments; // チューブの分割数
   radialSegments; // パイプの分割数
   currentP; // p の値
@@ -99,36 +111,19 @@ class ThreeApp {
     this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
-    // ディレクショナルライト（平行光源）
-    this.directionalLight = new THREE.DirectionalLight(
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.color,
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.intensity
-    );
-    // NOTE: copyにする理由は、参照渡しではなく値渡しにするため
-    this.directionalLight.position.copy(
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
-    );
-    this.scene.add(this.directionalLight);
-    // アンビエントライト（環境光）
-    this.ambientLight = new THREE.AmbientLight(
-      ThreeApp.AMBIENT_LIGHT_PARAM.color,
-      ThreeApp.AMBIENT_LIGHT_PARAM.intensity
-    );
-    this.scene.add(this.ambientLight);
-
     this.geometry = new THREE.TorusKnotGeometry(1, 0.4, 50, 16);
     // マテリアル
-    this.material = new THREE.MeshNormalMaterial({
-      color: ThreeApp.MATERIAL_PARAM,
+    this.material = new THREE.MeshBasicMaterial({
+      color: 0x808080,
+      wireframe: true,
+      opacity: 0.3,
+      transparent: true,
     });
+
     // メッシュ
     this.box = new THREE.Mesh(this.geometry, this.material);
-    this.scene.add(this.box);
 
-    // 軸ヘルパー
-    const axesHelper = 5.0;
-    this.axesHelper = new THREE.AxesHelper(axesHelper);
-    this.scene.add(this.axesHelper);
+    this.scene.add(this.box);
 
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -138,10 +133,10 @@ class ThreeApp {
     // キーの押下状態を保持するフラグ
     this.isDown = false;
 
-    this.tubularSegments = 64;
-    this.radialSegments = 8;
-    this.currentP = 2;
-    this.currentQ = 3;
+    this.tubularSegments = ThreeApp.GEOMETRY_PARAM.tubularSegments;
+    this.radialSegments = ThreeApp.GEOMETRY_PARAM.radialSegments;
+    this.currentP = ThreeApp.GEOMETRY_PARAM.p;
+    this.currentQ = ThreeApp.GEOMETRY_PARAM.q;
 
     // キーの押下や離す操作を検出できるようにする
     window.addEventListener(
@@ -169,29 +164,28 @@ class ThreeApp {
   render() {
     requestAnimationFrame(this.render);
     this.controls.update();
-    this.box.rotation.y += 0.008;
-    this.box.rotation.x += -0.008;
 
     if (this.isDown === true) {
       this.scene.remove(this.box);
       this.box.geometry.dispose();
       this.box.material.dispose();
 
+      this.tube = Math.random() * 0.6;
       this.tubularSegments = Math.floor(Math.random() * 301);
-      if (this.tubularSegments < 3) this.tubularSegments = 64;
-
       this.radialSegments = Math.floor(Math.random() * 20);
-      if (this.radialSegments < 3) this.radialSegments = 8;
-
       this.currentP = Math.random() * 50;
-      if (this.currentP === 0) this.currentP = 2;
-
       this.currentQ = Math.random() * 50;
-      if (this.currentQ === 0) this.currentQ = 2;
+
+      if (this.tubularSegments < 3)
+        this.tubularSegments = ThreeApp.GEOMETRY_PARAM.tubularSegments;
+      if (this.radialSegments < 3)
+        this.radialSegments = ThreeApp.GEOMETRY_PARAM.radialSegments;
+      if (this.currentP === 0) this.currentP = ThreeApp.GEOMETRY_PARAM.p;
+      if (this.currentQ === 0) this.currentQ = ThreeApp.GEOMETRY_PARAM.q;
 
       this.geometry = new THREE.TorusKnotGeometry(
         1,
-        0.4,
+        this.tube,
         this.tubularSegments,
         this.radialSegments,
         this.currentP,
@@ -201,7 +195,6 @@ class ThreeApp {
       this.scene.add(this.box);
     }
 
-    // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
   }
 }

@@ -13,8 +13,11 @@ export function Header(props: PageProps) {
 
   return (
     <div className="ps-3">
-      WebGL&nbsp;School&nbsp;-&nbsp;
-      <span className="font-bold">{pageName}</span>
+      WebGL&nbsp;Assignment&nbsp;Collection&nbsp;-&nbsp;
+      {pageName !== "Top" && <span className="font-bold">{pageName}</span>}
+      {pageName === "Top" && (
+        <span className="text-lg">Press&nbsp;Shift&nbsp;Key</span>
+      )}
     </div>
   );
 }
