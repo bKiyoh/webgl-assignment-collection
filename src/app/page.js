@@ -3,19 +3,13 @@ import { useEffect } from "react";
 import * as THREE from "@/lib/threeJs/three.module.js";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 
-export default function Page() {
+export default function Home() {
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl");
     const app = new ThreeApp(wrapper, width, height);
     app.render();
 
-    /**
-     * NOTE: クリーンアップ関数
-     * この関数は、コンポーネントがアンマウントされる際や、
-     * useEffectの依存関係が変わる前に実行される
-     *  これを行わないと、再レンダリングのたびに新しいcanvas要素が追加され続けてしまう
-     */
     return () => {
       if (wrapper) {
         while (wrapper.firstChild) {
@@ -27,14 +21,7 @@ export default function Page() {
   return <div id="webgl" />;
 }
 
-/**
- * three.js を効率よく扱うために自家製の制御クラスを定義
- */
 class ThreeApp {
-  /**
-   * カメラ定義のための定数
-   * aspectは引数の値を使用する
-   */
   static CAMERA_PARAM = {
     fovy: 60,
     near: 0.1,
@@ -42,12 +29,9 @@ class ThreeApp {
     position: new THREE.Vector3(0.0, 2.0, 5.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
-  /**
-   * レンダラー定義のための定数
-   * width, heightは引数の値を使用する
-   */
+
   static RENDERER_PARAM = {
-    clearColor: 0x666666, // 画面をクリアする色
+    clearColor: "#0c0a09",
     rendererRatio: 120,
   };
   /**
@@ -59,25 +43,26 @@ class ThreeApp {
     position: new THREE.Vector3(1.0, 1.0, 1.0), // 光の向き
   };
   /**
-   * アンビエントライト定義のための定数
+   * アンビエントライト定義のための定数 @@@
    */
   static AMBIENT_LIGHT_PARAM = {
     color: 0xffffff, // 光の色
     intensity: 0.1, // 光の強度
   };
-  /**
-   * マテリアル定義のための定数
-   */
+
   static MATERIAL_PARAM = {
-    color: 0x3399ff,
+    color: 0x6699ff, // マテリアルの色
   };
+
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // アンビエントライト
-  geometry; // ジオメトリ
-  material; // マテリアル
+  tubularSegments; // チューブの分割数
+  radialSegments; // パイプの分割数
+  currentP; // p の値
+  currentQ; // q の値
   box; // ボックスメッシュ
   controls; // オービットコントロール
   axesHelper; // 軸ヘルパー
@@ -131,9 +116,11 @@ class ThreeApp {
     );
     this.scene.add(this.ambientLight);
 
-    // ジオメトリとマテリアル
-    this.geometry = new THREE.BoxGeometry(1.0, 1.0, 1.0);
-    this.material = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
+    this.geometry = new THREE.TorusKnotGeometry(1, 0.4, 50, 16);
+    // マテリアル
+    this.material = new THREE.MeshNormalMaterial({
+      color: ThreeApp.MATERIAL_PARAM,
+    });
     // メッシュ
     this.box = new THREE.Mesh(this.geometry, this.material);
     this.scene.add(this.box);
@@ -150,6 +137,11 @@ class ThreeApp {
 
     // キーの押下状態を保持するフラグ
     this.isDown = false;
+
+    this.tubularSegments = 64;
+    this.radialSegments = 8;
+    this.currentP = 2;
+    this.currentQ = 3;
 
     // キーの押下や離す操作を検出できるようにする
     window.addEventListener(
@@ -168,7 +160,6 @@ class ThreeApp {
     window.addEventListener(
       "keyup",
       (keyEvent) => {
-        // なんらかのキーが離された操作で無条件にフラグを下ろす
         this.isDown = false;
       },
       false
@@ -176,19 +167,38 @@ class ThreeApp {
   }
 
   render() {
-    // 恒常ループの設定
     requestAnimationFrame(this.render);
-
-    // コントロールを更新
     this.controls.update();
+    this.box.rotation.y += 0.008;
+    this.box.rotation.x += -0.008;
 
-    // フラグに応じてオブジェクトの状態を変化させる
     if (this.isDown === true) {
-      // rotation プロパティは Euler クラスのインスタンス
-      // XYZ の各軸に対する回転をラジアンで指定する
-      this.box.rotation.y += 0.05;
-      this.box.rotation.x += -0.025;
-      this.box.rotation.z += -0.025;
+      this.scene.remove(this.box);
+      this.box.geometry.dispose();
+      this.box.material.dispose();
+
+      this.tubularSegments = Math.floor(Math.random() * 301);
+      if (this.tubularSegments < 3) this.tubularSegments = 64;
+
+      this.radialSegments = Math.floor(Math.random() * 20);
+      if (this.radialSegments < 3) this.radialSegments = 8;
+
+      this.currentP = Math.random() * 50;
+      if (this.currentP === 0) this.currentP = 2;
+
+      this.currentQ = Math.random() * 50;
+      if (this.currentQ === 0) this.currentQ = 2;
+
+      this.geometry = new THREE.TorusKnotGeometry(
+        1,
+        0.4,
+        this.tubularSegments,
+        this.radialSegments,
+        this.currentP,
+        this.currentQ
+      );
+      this.box = new THREE.Mesh(this.geometry, this.material);
+      this.scene.add(this.box);
     }
 
     // レンダラーで描画
