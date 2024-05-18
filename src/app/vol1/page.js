@@ -181,6 +181,18 @@ class ThreeApp {
     intensity: 0.1, // 光の強度
   };
   /**
+   * スポットライト定義のための定数
+   */
+  static SPOT_LIGHT_PARAM = {
+    color: 0xffffff,
+    intensity: 60,
+    position: { x: 2, y: 3, z: 3 },
+    angle: Math.PI / 5,
+    penumbra: 0.2,
+    castShadow: true,
+    shadowMapSize: { width: 1024, height: 1024 },
+  };
+  /**
    * マテリアル定義のための定数
    */
   static MATERIAL_PARAM = {
@@ -234,7 +246,6 @@ class ThreeApp {
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
     // 平行光源（ディレクショナルライト）
-    // todo: this.directionalLight に対して、ThreeApp.DIRECTIONAL_LIGHT_PARAM の値を設定してください
     this.directionalLight = new THREE.DirectionalLight(
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.color,
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.intensity
@@ -257,35 +268,45 @@ class ThreeApp {
     this.scene.add(this.ambientLight);
 
     // スポットライト
-    // todo: スポットライトを設定してください
-    this.spotLight = new THREE.SpotLight(0xffffff, 60);
-    this.spotLight.position.set(2, 3, 3);
-    this.spotLight.angle = Math.PI / 5;
-    this.spotLight.penumbra = 0.2;
-    this.spotLight.castShadow = true;
-    this.spotLight.shadow.mapSize.width = 1024;
-    this.spotLight.shadow.mapSize.height = 1024;
+    this.spotLight = new THREE.SpotLight(
+      ThreeApp.SPOT_LIGHT_PARAM.color,
+      ThreeApp.SPOT_LIGHT_PARAM.intensity
+    );
+    this.spotLight.position.copy(ThreeApp.SPOT_LIGHT_PARAM.position);
+    this.spotLight.angle = ThreeApp.SPOT_LIGHT_PARAM.angle;
+    this.spotLight.penumbra = ThreeApp.SPOT_LIGHT_PARAM.penumbra;
+    this.spotLight.castShadow = ThreeApp.SPOT_LIGHT_PARAM.castShadow;
+    Object.assign(
+      this.spotLight.shadow.mapSize,
+      ThreeApp.SPOT_LIGHT_PARAM.shadowMapSize
+    );
     this.scene.add(this.spotLight);
 
     // マテリアル
     this.material = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
 
     // ジオメトリー
-    const boxGeometry = 100;
-    const transformScale = 5.0;
     this.geometry = new THREE.BoxGeometry(0.18, 0.18, 0.18);
     this.boxArray = [];
     this.positionFlg = false;
+    /*
+     * NOTE: 立方体メッシュの作成
+     * 1. `range` 配列（[-2, -1, 0, 1, 2]）を使って x, y, z の各軸に対して 5 つの値を持つループを設定
+     * 2. 合計で 125 個のメッシュ（5 x 5 x 5 = 125）を作成し、各メッシュを立方体の形に配置
+     * 3. 各メッシュは、Three.js の `Mesh` クラスを使って作成され、指定された位置に設定されます
+     * 4. その後、各メッシュをシーンに追加し、`Box` クラスのインスタンスとして管理
+     * 5. 各メッシュの作成ごとに位置フラグを反転させ、配列 `boxArray` に追加
+     * */
     const range = [-2, -1, 0, 1, 2];
     range.forEach((z) => {
       range.forEach((y) => {
         range.forEach((x) => {
           const boxMesh = new THREE.Mesh(this.geometry, this.material);
+          // ボックスの位置を設定 (x, y, z の値を5で割ることで位置を決定)
           boxMesh.position.set(x / 5, y / 5, z / 5);
-          boxMesh.castShadow = true;
           this.scene.add(boxMesh);
-          this.positionFlg = !this.positionFlg;
           const box = new Box(boxMesh, this.positionFlg);
+          this.positionFlg = !this.positionFlg;
           this.boxArray.push(box);
         });
       });
