@@ -258,7 +258,7 @@ class ThreeApp {
 
     // スポットライト
     // todo: スポットライトを設定してください
-    this.spotLight = new THREE.SpotLight(0xffffff, 1);
+    this.spotLight = new THREE.SpotLight(0xffffff, 60);
     this.spotLight.position.set(2, 3, 3);
     this.spotLight.angle = Math.PI / 5;
     this.spotLight.penumbra = 0.2;
