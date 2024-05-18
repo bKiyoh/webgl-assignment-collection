@@ -28,12 +28,13 @@ export default function Home() {
 class ThreeApp {
   /**
    * カメラ定義のための定数
-   * aspectは引数の値を使用する
    */
   static CAMERA_PARAM = {
     fovy: 60,
+    // 描画する空間のアスペクト比（縦横比）引数の値を使用する
+    // aspect: window.innerWidth / window.innerHeight,
     near: 0.1,
-    far: 10.0,
+    far: 50.0,
     position: new THREE.Vector3(0.0, 0.0, 5.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };

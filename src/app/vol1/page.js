@@ -14,7 +14,7 @@ export default function Page() {
      * NOTE: クリーンアップ関数
      * この関数は、コンポーネントがアンマウントされる際や、
      * useEffectの依存関係が変わる前に実行される
-     *  これを行わないと、再レンダリングのたびに新しいcanvas要素が追加され続けてしまう
+     * これを行わないと、再レンダリングのたびに新しいcanvas要素が追加され続けてしまう
      */
     return () => {
       if (wrapper) {
@@ -33,13 +33,21 @@ export default function Page() {
 class ThreeApp {
   /**
    * カメラ定義のための定数
-   * aspectは引数の値を使用する
    */
   static CAMERA_PARAM = {
+    // fovy は Field of View Y のことで、縦方向の視野角を意味する
     fovy: 60,
+    // 描画する空間のアスペクト比（縦横比）
+    // aspect: window.innerWidth / window.innerHeight,
+    // 描画する空間のニアクリップ面（最近面）
+    // NOTE: 表示するスタートライン
     near: 0.1,
-    far: 10.0,
-    position: new THREE.Vector3(0.0, 2.0, 5.0),
+    // 描画する空間のファークリップ面（最遠面）
+    // NOTE: 表示するエンドライン
+    far: 100.0,
+    // カメラの座標
+    position: new THREE.Vector3(12.0, 2.0, 12.0),
+    // カメラの注視点
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -74,11 +82,13 @@ class ThreeApp {
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
+  aspect; // アスペクト比
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // アンビエントライト
   geometry; // ジオメトリ
   material; // マテリアル
   box; // ボックスメッシュ
+  boxArray; // トーラスメッシュの配列
   controls; // オービットコントロール
   axesHelper; // 軸ヘルパー
   isDown; // キーの押下状態用フラグ
@@ -104,10 +114,10 @@ class ThreeApp {
     this.scene = new THREE.Scene();
 
     // カメラ
-    const aspect = width / height;
+    this.aspect = width / height;
     this.camera = new THREE.PerspectiveCamera(
       ThreeApp.CAMERA_PARAM.fovy,
-      aspect,
+      this.aspect,
       ThreeApp.CAMERA_PARAM.near,
       ThreeApp.CAMERA_PARAM.far
     );
@@ -131,12 +141,27 @@ class ThreeApp {
     );
     this.scene.add(this.ambientLight);
 
-    // ジオメトリとマテリアル
-    this.geometry = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+    // マテリアル
+
     this.material = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
-    // メッシュ
-    this.box = new THREE.Mesh(this.geometry, this.material);
-    this.scene.add(this.box);
+
+    // 共通のジオメトリ、マテリアルから、複数のメッシュインスタンスを作成する
+    const boxGeometry = 100;
+    const transformScale = 5.0;
+    this.geometry = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+    this.boxArray = [];
+    for (let i = 0; i < boxGeometry; i++) {
+      // トーラスメッシュを生成
+      const torus = new THREE.Mesh(this.geometry, this.material);
+      // トーラスメッシュの位置をランダムに設定
+      torus.position.x = (Math.random() * 2.0 - 1.0) * transformScale;
+      torus.position.y = (Math.random() * 2.0 - 1.0) * transformScale;
+      torus.position.z = (Math.random() * 2.0 - 1.0) * transformScale;
+      // シーンに追加
+      this.scene.add(torus);
+      // 配列に格納
+      this.boxArray.push(torus);
+    }
 
     // 軸ヘルパー
     const axesHelper = 5.0;
@@ -173,6 +198,18 @@ class ThreeApp {
       },
       false
     );
+    window.addEventListener(
+      "resize",
+      () => {
+        // レンダラの大きさを設定
+        this.renderer.setSize(width, height);
+        // カメラが撮影する視錐台のアスペクト比を再設定
+        this.camera.aspect = this.aspect;
+        // カメラのパラメータが変更されたときは行列を更新する
+        this.camera.updateProjectionMatrix();
+      },
+      false
+    );
   }
 
   render() {
@@ -184,11 +221,10 @@ class ThreeApp {
 
     // フラグに応じてオブジェクトの状態を変化させる
     if (this.isDown === true) {
-      // rotation プロパティは Euler クラスのインスタンス
-      // XYZ の各軸に対する回転をラジアンで指定する
-      this.box.rotation.y += 0.05;
-      this.box.rotation.x += -0.025;
-      this.box.rotation.z += -0.025;
+      this.boxArray.forEach((torus) => {
+        // トーラスメッシュの位置をランダムに設定
+        torus.rotation.y += 0.05;
+      });
     }
 
     // レンダラーで描画
