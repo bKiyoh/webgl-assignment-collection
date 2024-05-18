@@ -141,7 +141,7 @@ class ThreeApp {
      */
     far: 50.0,
     // カメラの座標
-    position: new THREE.Vector3(2.0, 2.0, 4.0),
+    position: new THREE.Vector3(2, 1, 2.2),
     // カメラの注視点
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
@@ -150,7 +150,7 @@ class ThreeApp {
    * NOTE: width, heightは引数の値を使用する
    */
   static RENDERER_PARAM = {
-    clearColor: 0x666666, // 画面をクリアする色
+    clearColor: 0x80cbc4, // 画面をクリアする色
     rendererRatio: 120, // レンダラーの比率
   };
   /**
@@ -158,7 +158,7 @@ class ThreeApp {
    */
   static DIRECTIONAL_LIGHT_PARAM = {
     color: 0xffffff, // 光の色
-    intensity: 1.5, // 光の強度
+    intensity: 0.3, // 光の強度
     position: new THREE.Vector3(0, 2, 0), // 光の向き
     shadow: {
       near: 1,
@@ -168,8 +168,8 @@ class ThreeApp {
       top: 1,
       bottom: -1,
       mapSize: {
-        width: 1024,
-        height: 1024,
+        width: 2048,
+        height: 2048,
       },
     },
   };
@@ -177,26 +177,27 @@ class ThreeApp {
    * アンビエントライト定義のための定数
    */
   static AMBIENT_LIGHT_PARAM = {
-    color: 0xffffff, // 光の色
-    intensity: 0.1, // 光の強度
+    color1: 0xffffff, // 光の色
+    color2: 0xbfd4d2, // 光の色
+    intensity: 2, // 光の強度
   };
   /**
    * スポットライト定義のための定数
    */
   static SPOT_LIGHT_PARAM = {
     color: 0xffffff,
-    intensity: 60,
+    intensity: 20,
     position: { x: 2, y: 3, z: 3 },
     angle: Math.PI / 5,
     penumbra: 0.2,
     castShadow: true,
-    shadowMapSize: { width: 1024, height: 1024 },
+    shadowMapSize: { width: 2048, height: 2048 },
   };
   /**
    * マテリアル定義のための定数
    */
   static MATERIAL_PARAM = {
-    color: 0x3399ff,
+    color: 0xfce4ec,
   };
   renderer; // レンダラ
   scene; // シーン
@@ -253,16 +254,12 @@ class ThreeApp {
     this.directionalLight.position.copy(
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
     );
-    this.directionalLight.castShadow = true;
-    Object.assign(
-      this.directionalLight.shadow.camera,
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.shadow
-    );
     this.scene.add(this.directionalLight);
 
     // アンビエントライト（環境光）
-    this.ambientLight = new THREE.AmbientLight(
-      ThreeApp.AMBIENT_LIGHT_PARAM.color,
+    this.ambientLight = new THREE.HemisphereLight(
+      ThreeApp.AMBIENT_LIGHT_PARAM.color1,
+      ThreeApp.AMBIENT_LIGHT_PARAM.color2,
       ThreeApp.AMBIENT_LIGHT_PARAM.intensity
     );
     this.scene.add(this.ambientLight);
@@ -283,7 +280,7 @@ class ThreeApp {
     this.scene.add(this.spotLight);
 
     // マテリアル
-    this.material = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
+    this.material = new THREE.MeshToonMaterial(ThreeApp.MATERIAL_PARAM);
 
     // ジオメトリー
     this.geometry = new THREE.BoxGeometry(0.18, 0.18, 0.18);

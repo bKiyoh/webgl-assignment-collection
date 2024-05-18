@@ -10,8 +10,11 @@ import { LINK_DATA } from "@/constants/linkData";
 
 export default function Template({ children }: { children: React.ReactNode }) {
   const currentUrl = usePathname();
-  const initPageName = LINK_DATA.find((item) => item.root === currentUrl)?.name;
-  const [pageName, setPageName] = useState<string>(initPageName || "");
+  const currentPage = LINK_DATA.find((item) => item.root === currentUrl);
+  const [pageName, setPageName] = useState<string>(currentPage?.name || "");
+  const [isAction, setIsAction] = useState<boolean>(
+    currentPage?.pressShiftKey || false
+  );
   return (
     <ThemeProvider
       attribute="class"
@@ -23,7 +26,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
         <div className="flex justify-start">
           <NavigationMenu pageName={pageName} onChange={setPageName} />
           <div className="invisible md:visible">
-            <Header pageName={pageName} />
+            <Header pageName={pageName} isAction={isAction} />
           </div>
         </div>
         <div className="w-full flex justify-center">{children}</div>
