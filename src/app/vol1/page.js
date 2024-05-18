@@ -114,7 +114,7 @@ class Box {
      * 線形保管とは => 中間地点の計算
      * https://qiita.com/niusounds/items/c4af702b06582590c82e
      */
-    this.mesh.position.lerp(this.initialPosition, this.LERP_FACTOR);
+    this.mesh.position.lerp(this.initialPosition, Box.LERP_FACTOR);
   }
 }
 
