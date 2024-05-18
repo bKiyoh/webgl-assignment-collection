@@ -68,6 +68,7 @@ class ThreeApp {
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
+  aspect; // アスペクト比
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // アンビエントライト
   tube; // チューブメッシュ
@@ -101,10 +102,10 @@ class ThreeApp {
     this.scene = new THREE.Scene();
 
     // カメラ
-    const aspect = width / height;
+    this.aspect = width / height;
     this.camera = new THREE.PerspectiveCamera(
       ThreeApp.CAMERA_PARAM.fovy,
-      aspect,
+      this.aspect,
       ThreeApp.CAMERA_PARAM.near,
       ThreeApp.CAMERA_PARAM.far
     );
@@ -156,6 +157,18 @@ class ThreeApp {
       "keyup",
       (keyEvent) => {
         this.isDown = false;
+      },
+      false
+    );
+    window.addEventListener(
+      "resize",
+      () => {
+        // レンダラの大きさを設定
+        this.renderer.setSize(width, height);
+        // カメラが撮影する視錐台のアスペクト比を再設定
+        this.camera.aspect = this.aspect;
+        // カメラのパラメータが変更されたときは行列を更新する
+        this.camera.updateProjectionMatrix();
       },
       false
     );
