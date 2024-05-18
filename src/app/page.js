@@ -25,14 +25,17 @@ export default function Home() {
   );
 }
 
+/**
+ * ThreeApp クラス
+ * three.js を効率よく扱うために自家製の制御クラスを定義
+ */
 class ThreeApp {
   /**
    * カメラ定義のための定数
+   * NOTE: アスペクト比は引数の値を使用する
    */
   static CAMERA_PARAM = {
     fovy: 60,
-    // 描画する空間のアスペクト比（縦横比）引数の値を使用する
-    // aspect: window.innerWidth / window.innerHeight,
     near: 0.1,
     far: 50.0,
     position: new THREE.Vector3(0.0, 0.0, 5.0),
@@ -40,7 +43,7 @@ class ThreeApp {
   };
   /**
    * レンダラー定義のための定数
-   * width, heightは引数の値を使用する
+   * NOTE: width, heightは引数の値を使用する
    */
   static RENDERER_PARAM = {
     clearColor: "#0c0a09",
@@ -70,8 +73,6 @@ class ThreeApp {
   scene; // シーン
   camera; // カメラ
   aspect; // アスペクト比
-  directionalLight; // 平行光源（ディレクショナルライト）
-  ambientLight; // アンビエントライト
   tube; // チューブメッシュ
   tubularSegments; // チューブの分割数
   radialSegments; // パイプの分割数
@@ -113,23 +114,20 @@ class ThreeApp {
     this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
+    // ジオメトリ
     this.geometry = new THREE.TorusKnotGeometry(1, 0.4, 50, 16);
+
     // マテリアル
-    this.material = new THREE.MeshBasicMaterial({
-      color: 0x808080,
-      wireframe: true,
-      opacity: 0.3,
-      transparent: true,
-    });
+    this.material = new THREE.MeshBasicMaterial(ThreeApp.MATERIAL_PARAM);
 
     // メッシュ
     this.box = new THREE.Mesh(this.geometry, this.material);
-
     this.scene.add(this.box);
 
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
+    // this のバインド
     this.render = this.render.bind(this);
 
     // キーの押下状態を保持するフラグ
@@ -180,23 +178,30 @@ class ThreeApp {
     this.controls.update();
 
     if (this.isDown === true) {
-      this.scene.remove(this.box);
-      this.box.geometry.dispose();
-      this.box.material.dispose();
+      // マウスが押されている場合の処理を開始
+      this.scene.remove(this.box); // 現在のボックスをシーンから削除
+      this.box.geometry.dispose(); // 現在のボックスのジオメトリを破棄
+      this.box.material.dispose(); // 現在のボックスのマテリアルを破棄
 
+      // ランダムなパラメータを生成
       this.tube = Math.random() * 0.6;
       this.tubularSegments = Math.floor(Math.random() * 301);
       this.radialSegments = Math.floor(Math.random() * 20);
       this.currentP = Math.random() * 50;
       this.currentQ = Math.random() * 50;
 
+      // tubularSegmentsが3未満の場合、デフォルト値を使用
       if (this.tubularSegments < 3)
         this.tubularSegments = ThreeApp.GEOMETRY_PARAM.tubularSegments;
+      // radialSegmentsが3未満の場合、デフォルト値を使用
       if (this.radialSegments < 3)
         this.radialSegments = ThreeApp.GEOMETRY_PARAM.radialSegments;
+      // currentPが0の場合、デフォルト値を使用
       if (this.currentP === 0) this.currentP = ThreeApp.GEOMETRY_PARAM.p;
+      // currentQが0の場合、デフォルト値を使用
       if (this.currentQ === 0) this.currentQ = ThreeApp.GEOMETRY_PARAM.q;
 
+      // 新しいTorusKnotGeometryを生成
       this.geometry = new THREE.TorusKnotGeometry(
         1,
         this.tube,
@@ -205,6 +210,7 @@ class ThreeApp {
         this.currentP,
         this.currentQ
       );
+      // 新しいボックスメッシュを作成し、シーンに追加
       this.box = new THREE.Mesh(this.geometry, this.material);
       this.scene.add(this.box);
     }
