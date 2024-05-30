@@ -108,6 +108,7 @@ class ThreeApp {
   static MATERIAL_PARAM = {
     color: 0xfce4ec,
   };
+
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
@@ -115,13 +116,12 @@ class ThreeApp {
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // アンビエントライト
   spotLight; // スポットライト
-  geometry; // ジオメトリ
   material; // マテリアル
-  box; // ボックスメッシュ
-  boxArray; // トーラスメッシュの配列
-  positionFlg; // 位置フラグ
   controls; // オービットコントロール
   isDown; // キーの押下状態用フラグ
+  group; // グループ
+  bladesGroup; // 羽グループ
+  rotationDirection;
 
   /**
    * コンストラクタ
@@ -201,6 +201,45 @@ class ThreeApp {
     const shaftGeometry = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 64);
     const armGeometry = new THREE.CapsuleGeometry(0.08, 0.4, 32, 64);
 
+    this.rotationDirection = 1; // 初期の回転方向
+
+    // カスタムジオメトリで羽を作成
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(0, 0);
+    bladeShape.lineTo(0.7, 0.05);
+    bladeShape.quadraticCurveTo(0.6, 0.3, 0.3, 0.15);
+
+    const extrudeSettings = {
+      steps: 2,
+      depth: 0.02,
+      bevelEnabled: true,
+      bevelThickness: 0.01,
+      bevelSize: 0.01,
+      bevelSegments: 1,
+    };
+
+    const bladeGeometry = new THREE.ExtrudeGeometry(
+      bladeShape,
+      extrudeSettings
+    );
+
+    // グループ
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
+    // 羽グループの作成
+    this.bladesGroup = new THREE.Group();
+
+    // 羽を作成し、羽グループに追加
+    for (let i = 0; i < 3; i++) {
+      const blade = new THREE.Mesh(bladeGeometry, this.material);
+      blade.rotation.z = i * ((2 * Math.PI) / 3); // 120度ずつ回転
+      this.bladesGroup.add(blade);
+    }
+
+    // 羽グループを所定の位置に配置
+    this.bladesGroup.position.set(0, 0.75, 0.4);
+
+    // ベース、シャフト、アームメッシュの作成とシーンへの追加
     const baseMesh = new THREE.Mesh(baseGeometry, this.material);
     const shaftMesh = new THREE.Mesh(shaftGeometry, this.material);
     const armMesh = new THREE.Mesh(armGeometry, this.material);
@@ -212,11 +251,10 @@ class ThreeApp {
 
     this.scene.add(baseMesh);
     this.scene.add(shaftMesh);
-    this.scene.add(armMesh);
+    this.group.add(armMesh);
+    this.group.add(this.bladesGroup);
 
-    this.positionFlg = false;
-
-    // コントロール
+    // コントロールの設定
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
     // thisのバインド
@@ -229,7 +267,6 @@ class ThreeApp {
     window.addEventListener(
       "keydown",
       (keyEvent) => {
-        // スペースキーが押されている場合はフラグを立てる
         switch (keyEvent.key) {
           case " ":
             this.isDown = true;
@@ -242,7 +279,6 @@ class ThreeApp {
     window.addEventListener(
       "keyup",
       (keyEvent) => {
-        // なんらかのキーが離された操作で無条件にフラグを下ろす
         this.isDown = false;
       },
       false
@@ -250,11 +286,8 @@ class ThreeApp {
     window.addEventListener(
       "resize",
       () => {
-        // レンダラの大きさを設定
         this.renderer.setSize(width, height);
-        // カメラが撮影する視錐台のアスペクト比を再設定
         this.camera.aspect = this.aspect;
-        // カメラのパラメータが変更されたときは行列を更新する
         this.camera.updateProjectionMatrix();
       },
       false
@@ -270,6 +303,17 @@ class ThreeApp {
 
     // コントロールを更新
     this.controls.update();
+
+    // フラグに応じてオブジェクトの状態を変化させる
+    if (this.isDown === true) {
+      this.bladesGroup.rotation.z += 0.6;
+      this.group.rotation.y += 0.01 * this.rotationDirection;
+
+      // 回転角度が一定範囲を超えたら方向を反転する
+      if (this.group.rotation.y >= 1.2 || this.group.rotation.y <= -1.2) {
+        this.rotationDirection *= -1;
+      }
+    }
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
