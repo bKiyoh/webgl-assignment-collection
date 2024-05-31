@@ -13,11 +13,7 @@ import { on } from "events";
 
 export default function Page() {
   useEffect(() => {
-    const {
-      innerHeight: height,
-      innerWidth: width,
-      devicePixelRatio: ratio,
-    } = window;
+    const { innerHeight: height, innerWidth: width } = window;
     // ラッパー要素の取得
     const wrapper = document.querySelector("#webgl");
     const app = new ThreeApp(wrapper, width, height);
@@ -51,7 +47,7 @@ class ThreeApp {
    */
   static CAMERA_PARAM = {
     // fovy は Field of View Y のことで、縦方向の視野角を意味する
-    fovy: 70,
+    fovy: 60,
     /*
      * 描画する空間のニアクリップ面（最近面）
      * 表示するスタートライン
@@ -154,21 +150,55 @@ class ThreeApp {
    * @param {HTMLElement} wrapper - canvas 要素を append する親要素
    * @param {number} width - レンダラーに設定する幅
    * @param {number} height - レンダラーに設定する高さ
-   * @param {number} ratio - デバイスピクセル比
    */
-  constructor(wrapper, width, height, ratio) {
+  constructor(wrapper, width, height) {
     // レンダラ
     const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
-    this.renderer.setPixelRatio(ratio);
-    this.renderer.setSize(width, height);
+    this.renderer.setSize(
+      width - ThreeApp.RENDERER_PARAM.rendererRatio,
+      height - ThreeApp.RENDERER_PARAM.rendererRatio
+    );
     wrapper.appendChild(this.renderer.domElement);
     // レンダラーの自動クリアを無効にする
     this.renderer.autoClear = false;
 
     // シーン
     this.scene = new THREE.Scene();
+
+    // 平行光源（ディレクショナルライト）
+    this.directionalLight = new THREE.DirectionalLight(
+      ThreeApp.DIRECTIONAL_LIGHT_PARAM.color,
+      ThreeApp.DIRECTIONAL_LIGHT_PARAM.intensity
+    );
+    this.directionalLight.position.copy(
+      ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
+    );
+    this.scene.add(this.directionalLight);
+
+    // アンビエントライト（環境光）
+    this.ambientLight = new THREE.HemisphereLight(
+      ThreeApp.AMBIENT_LIGHT_PARAM.color1,
+      ThreeApp.AMBIENT_LIGHT_PARAM.color2,
+      ThreeApp.AMBIENT_LIGHT_PARAM.intensity
+    );
+    this.scene.add(this.ambientLight);
+
+    // スポットライト
+    this.spotLight = new THREE.SpotLight(
+      ThreeApp.SPOT_LIGHT_PARAM.color,
+      ThreeApp.SPOT_LIGHT_PARAM.intensity
+    );
+    this.spotLight.position.copy(ThreeApp.SPOT_LIGHT_PARAM.position);
+    this.spotLight.angle = ThreeApp.SPOT_LIGHT_PARAM.angle;
+    this.spotLight.penumbra = ThreeApp.SPOT_LIGHT_PARAM.penumbra;
+    this.spotLight.castShadow = ThreeApp.SPOT_LIGHT_PARAM.castShadow;
+    Object.assign(
+      this.spotLight.shadow.mapSize,
+      ThreeApp.SPOT_LIGHT_PARAM.shadowMapSize
+    );
+    this.scene.add(this.spotLight);
 
     // 軸ヘルパー
     const axesBarLength = 5.0;
