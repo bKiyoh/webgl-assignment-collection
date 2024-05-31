@@ -59,7 +59,7 @@ class ThreeApp {
      */
     far: 3000,
     // カメラの座標
-    position: new THREE.Vector3(2, 1, 3.2),
+    position: new THREE.Vector3(20, 10, 32), // カメラ位置を調整
     // カメラの注視点
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
     screenSpacePosition: new THREE.Vector3(),
@@ -80,14 +80,14 @@ class ThreeApp {
   static DIRECTIONAL_LIGHT_PARAM = {
     color: 0xffffff, // 光の色
     intensity: 0.3, // 光の強度
-    position: new THREE.Vector3(0, 2, 0), // 光の向き
+    position: new THREE.Vector3(0, 20, 0), // 光の向き
     shadow: {
       near: 1,
-      far: 10,
-      right: 1,
-      left: -1,
-      top: 1,
-      bottom: -1,
+      far: 100,
+      right: 10,
+      left: -10,
+      top: 10,
+      bottom: -10,
       mapSize: {
         width: 2048,
         height: 2048,
@@ -108,7 +108,7 @@ class ThreeApp {
   static SPOT_LIGHT_PARAM = {
     color: 0xffffff,
     intensity: 20,
-    position: { x: 2, y: 3, z: 3 },
+    position: { x: 20, y: 30, z: 30 },
     angle: Math.PI / 5,
     penumbra: 0.2,
     castShadow: true,
@@ -118,7 +118,7 @@ class ThreeApp {
    * マテリアル定義のための定数
    */
   static MATERIAL_PARAM = {
-    color: 0xfce4ec,
+    color: 0x000000,
   };
 
   static GOD_RAY_RENDER_TARGET_RESOLUTION_MULTIPLAYER = 1.0 / 4.0;
@@ -143,6 +143,7 @@ class ThreeApp {
   rotationDirection; // 回転方向
   stats; // ステータス
   postprocessing = { enabled: true }; // ポストプロセシングの有効化
+  wrapper; // canvas 要素を append する親要素
 
   /**
    * コンストラクタ
@@ -152,17 +153,25 @@ class ThreeApp {
    * @param {number} height - レンダラーに設定する高さ
    */
   constructor(wrapper, width, height) {
+    this.wrapper = wrapper;
+    this.width = width;
+    this.height = height;
+    this.init();
+    this.animate();
+  }
+
+  init() {
     // レンダラ
     const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
     this.renderer.setSize(
-      width - ThreeApp.RENDERER_PARAM.rendererRatio,
-      height - ThreeApp.RENDERER_PARAM.rendererRatio
+      this.width - ThreeApp.RENDERER_PARAM.rendererRatio,
+      this.height - ThreeApp.RENDERER_PARAM.rendererRatio
     );
-    wrapper.appendChild(this.renderer.domElement);
-    // レンダラーの自動クリアを無効にする
-    this.renderer.autoClear = false;
+    this.wrapper.appendChild(this.renderer.domElement);
+    // TODO:する必要があるのか？ レンダラーの自動クリアを無効にする
+    // this.renderer.autoClear = false;
 
     // シーン
     this.scene = new THREE.Scene();
@@ -201,12 +210,12 @@ class ThreeApp {
     this.scene.add(this.spotLight);
 
     // 軸ヘルパー
-    const axesBarLength = 5.0;
+    const axesBarLength = 50.0;
     this.axesHelper = new THREE.AxesHelper(axesBarLength);
     this.scene.add(this.axesHelper);
 
     // カメラ
-    this.aspect = width / height;
+    this.aspect = this.width / this.height;
     this.camera = new THREE.PerspectiveCamera(
       ThreeApp.CAMERA_PARAM.fovy,
       this.aspect,
@@ -221,24 +230,24 @@ class ThreeApp {
     this.material = new THREE.MeshToonMaterial(ThreeApp.MATERIAL_PARAM);
 
     // ジオメトリー
-    const baseGeometry = new THREE.CylinderGeometry(0.08, 0.6, 0.3, 64);
-    const shaftGeometry = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 64);
-    const armGeometry = new THREE.CapsuleGeometry(0.08, 0.4, 32, 64);
+    const baseGeometry = new THREE.CylinderGeometry(0.8, 6, 3, 64);
+    const shaftGeometry = new THREE.CylinderGeometry(0.8, 0.8, 15, 64);
+    const armGeometry = new THREE.CapsuleGeometry(0.8, 4, 32, 64);
 
     this.rotationDirection = 1; // 初期の回転方向
 
     // カスタムジオメトリで羽を作成
     const bladeShape = new THREE.Shape();
     bladeShape.moveTo(0, 0);
-    bladeShape.lineTo(0.7, 0.05);
-    bladeShape.quadraticCurveTo(0.6, 0.3, 0.3, 0.15);
+    bladeShape.lineTo(7, 0.5);
+    bladeShape.quadraticCurveTo(6, 3, 3, 1.5);
 
     const extrudeSettings = {
       steps: 2,
-      depth: 0.02,
+      depth: 0.2,
       bevelEnabled: true,
-      bevelThickness: 0.01,
-      bevelSize: 0.01,
+      bevelThickness: 0.1,
+      bevelSize: 0.1,
       bevelSegments: 1,
     };
 
@@ -261,16 +270,16 @@ class ThreeApp {
     }
 
     // 羽グループを所定の位置に配置
-    this.bladesGroup.position.set(0, 0.75, 0.4);
+    this.bladesGroup.position.set(0, 7.5, 4);
 
     // ベース、シャフト、アームメッシュの作成とシーンへの追加
     const baseMesh = new THREE.Mesh(baseGeometry, this.material);
     const shaftMesh = new THREE.Mesh(shaftGeometry, this.material);
     const armMesh = new THREE.Mesh(armGeometry, this.material);
 
-    baseMesh.position.y = -0.6;
-    armMesh.position.y = 0.75;
-    armMesh.position.z = 0.2;
+    baseMesh.position.y = -6;
+    armMesh.position.y = 7.5;
+    armMesh.position.z = 2;
     armMesh.rotateX(Math.PI / 2);
 
     this.scene.add(baseMesh);
@@ -287,10 +296,7 @@ class ThreeApp {
     this.controls.maxDistance = 500;
 
     this.stats = new Stats();
-    wrapper.appendChild(this.stats.dom);
-
-    // ポストプロセシングの初期化
-    // initPostprocessing(width, height);
+    this.wrapper.appendChild(this.stats.dom);
 
     // thisのバインド
     this.render = this.render.bind(this);
@@ -319,23 +325,23 @@ class ThreeApp {
       false
     );
 
-    window.addEventListener(
-      "resize",
-      () => {
-        this.renderer.setSize(width, height);
-        this.camera.aspect = this.aspect;
-        this.camera.updateProjectionMatrix();
-      },
-      false
-    );
-    // window.addEventListener("resize", () => this.onWindowResize.bind(this));
-    // //ポストプロセシングの初期化
-    // this.initPostprocessing(width, height);
+    // window.addEventListener(
+    //   "resize",
+    //   () => {
+    //     this.renderer.setSize(width, height);
+    //     this.camera.aspect = this.aspect;
+    //     this.camera.updateProjectionMatrix();
+    //   },
+    //   false
+    // );
+    window.addEventListener("resize", () => this.onWindowResize.bind(this));
+    //ポストプロセシングの初期化
+    this.initPostprocessing(this.width, this.height);
   }
 
   onWindowResize() {
-    const renderTargetWidth = width;
-    const renderTargetHeight = height;
+    const renderTargetWidth = this.width;
+    const renderTargetHeight = this.height;
 
     this.camera.aspect = renderTargetWidth / renderTargetHeight;
     this.camera.updateProjectionMatrix();
@@ -447,9 +453,6 @@ class ThreeApp {
    * 描画処理
    */
   render() {
-    // 恒常ループの設定
-    requestAnimationFrame(this.render);
-
     // コントロールを更新
     this.controls.update();
 
@@ -466,5 +469,14 @@ class ThreeApp {
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
+  }
+
+  animate() {
+    // 恒常ループの設定
+    requestAnimationFrame(this.animate);
+
+    this.stats.begin();
+    this.render();
+    this.stats.end();
   }
 }
