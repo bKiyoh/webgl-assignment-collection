@@ -157,7 +157,7 @@ class ThreeApp {
     this.width = width;
     this.height = height;
     this.init();
-    this.animate();
+    this.animation();
   }
 
   init() {
@@ -453,6 +453,9 @@ class ThreeApp {
    * 描画処理
    */
   render() {
+    // 恒常ループの設定
+    requestAnimationFrame(this.render);
+
     // コントロールを更新
     this.controls.update();
 
@@ -471,10 +474,7 @@ class ThreeApp {
     this.renderer.render(this.scene, this.camera);
   }
 
-  animate() {
-    // 恒常ループの設定
-    requestAnimationFrame(this.animate);
-
+  animation() {
     this.stats.begin();
     this.render();
     this.stats.end();
