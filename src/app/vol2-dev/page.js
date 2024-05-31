@@ -1,7 +1,6 @@
 "use client";
 import { useEffect } from "react";
 import * as THREE from "@/lib/threeJs/three.module.js";
-import Stats from "@/lib/threeJs/stats.module.js";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 import {
   GodRaysFakeSunShader,
@@ -9,16 +8,13 @@ import {
   GodRaysCombineShader,
   GodRaysGenerateShader,
 } from "@/lib/threeJs/GodRaysShader.js";
-import { on } from "events";
 
 export default function Page() {
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
-    // ラッパー要素の取得
     const wrapper = document.querySelector("#webgl");
     const app = new ThreeApp(wrapper, width, height);
     app.render();
-
     /**
      * NOTE: クリーンアップ関数
      * この関数は、コンポーネントがアンマウントされる際や、
@@ -46,20 +42,11 @@ class ThreeApp {
    * NOTE: アスペクト比は引数の値を使用する
    */
   static CAMERA_PARAM = {
-    // fovy は Field of View Y のことで、縦方向の視野角を意味する
     fovy: 60,
-    /*
-     * 描画する空間のニアクリップ面（最近面）
-     * 表示するスタートライン
-     */
     near: 0.1,
-    /*
-     * 描画する空間のファークリップ面（最遠面）
-     * 表示するエンドライン
-     */
     far: 3000,
     // カメラの座標
-    position: new THREE.Vector3(20, 10, 32), // カメラ位置を調整
+    position: new THREE.Vector3(20, 10, 32),
     // カメラの注視点
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
     screenSpacePosition: new THREE.Vector3(),
@@ -128,6 +115,9 @@ class ThreeApp {
     sunColor: 0xffee00,
   };
 
+  wrapper; // canvas 要素を append する親要素
+  width; // レンダラーに設定する幅
+  height; // レンダラーに設定する高さ
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
@@ -141,9 +131,7 @@ class ThreeApp {
   group; // グループ
   bladesGroup; // 羽グループ
   rotationDirection; // 回転方向
-  stats; // ステータス
   postprocessing = { enabled: true }; // ポストプロセシングの有効化
-  wrapper; // canvas 要素を append する親要素
 
   /**
    * コンストラクタ
@@ -161,7 +149,7 @@ class ThreeApp {
   }
 
   init() {
-    // レンダラ
+    // レンダラー
     const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
@@ -192,7 +180,13 @@ class ThreeApp {
       ThreeApp.AMBIENT_LIGHT_PARAM.color2,
       ThreeApp.AMBIENT_LIGHT_PARAM.intensity
     );
+
     this.scene.add(this.ambientLight);
+
+    // 軸ヘルパー
+    const axesBarLength = 50.0;
+    this.axesHelper = new THREE.AxesHelper(axesBarLength);
+    this.scene.add(this.axesHelper);
 
     // スポットライト
     this.spotLight = new THREE.SpotLight(
@@ -209,11 +203,6 @@ class ThreeApp {
     );
     this.scene.add(this.spotLight);
 
-    // 軸ヘルパー
-    const axesBarLength = 50.0;
-    this.axesHelper = new THREE.AxesHelper(axesBarLength);
-    this.scene.add(this.axesHelper);
-
     // カメラ
     this.aspect = this.width / this.height;
     this.camera = new THREE.PerspectiveCamera(
@@ -222,7 +211,6 @@ class ThreeApp {
       ThreeApp.CAMERA_PARAM.near,
       ThreeApp.CAMERA_PARAM.far
     );
-    // this.camera.position.z = 200;
     this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
@@ -242,6 +230,7 @@ class ThreeApp {
     bladeShape.lineTo(7, 0.5);
     bladeShape.quadraticCurveTo(6, 3, 3, 1.5);
 
+    // エクストルード設定
     const extrudeSettings = {
       steps: 2,
       depth: 0.2,
@@ -251,6 +240,7 @@ class ThreeApp {
       bevelSegments: 1,
     };
 
+    // エクストルードジオメトリ
     const bladeGeometry = new THREE.ExtrudeGeometry(
       bladeShape,
       extrudeSettings
@@ -259,7 +249,6 @@ class ThreeApp {
     // グループ
     this.group = new THREE.Group();
     this.scene.add(this.group);
-    // 羽グループの作成
     this.bladesGroup = new THREE.Group();
 
     // 羽を作成し、羽グループに追加
@@ -288,15 +277,11 @@ class ThreeApp {
     this.group.add(this.bladesGroup);
 
     // コントロールの設定
-    // domElementとは、レンダラーのdomElementを指す
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     // ズームの有効化
     this.controls.minDistance = 50;
     // ズームの最大距離
     this.controls.maxDistance = 500;
-
-    this.stats = new Stats();
-    this.wrapper.appendChild(this.stats.dom);
 
     // thisのバインド
     this.render = this.render.bind(this);
@@ -324,16 +309,6 @@ class ThreeApp {
       },
       false
     );
-
-    // window.addEventListener(
-    //   "resize",
-    //   () => {
-    //     this.renderer.setSize(width, height);
-    //     this.camera.aspect = this.aspect;
-    //     this.camera.updateProjectionMatrix();
-    //   },
-    //   false
-    // );
     window.addEventListener("resize", () => this.onWindowResize.bind(this));
     //ポストプロセシングの初期化
     this.initPostprocessing(this.width, this.height);
@@ -449,6 +424,24 @@ class ThreeApp {
     this.postprocessing.scene.add(this.postprocessing.quad);
   }
 
+  // ゴッドレイのフィルタリングステップサイズの計算
+  getStepSize(filterLen, tapsPerPass, pass) {
+    return filterLen * Math.pow(tapsPerPass, -pass);
+  }
+
+  // ゴッドレイのフィルタリング
+  filterGodRays(inputTex, renderTarget, stepSize) {
+    this.postprocessing.scene.overrideMaterial =
+      this.postprocessing.materialGodraysGenerate;
+
+    this.postprocessing.godrayGenUniforms["fStepSize"].value = stepSize;
+    this.postprocessing.godrayGenUniforms["tInput"].value = inputTex;
+
+    this.renderer.setRenderTarget(renderTarget);
+    this.renderer.render(postprocessing.scene, postprocessing.camera);
+    this.postprocessing.scene.overrideMaterial = null;
+  }
+
   /**
    * 描画処理
    */
@@ -461,8 +454,8 @@ class ThreeApp {
 
     // フラグに応じてオブジェクトの状態を変化させる
     if (this.isDown === true) {
-      this.bladesGroup.rotation.z += 0.6;
-      this.group.rotation.y += 0.01 * this.rotationDirection;
+      this.bladesGroup.rotation.z += 0.06;
+      this.group.rotation.y += 0.001 * this.rotationDirection;
 
       // 回転角度が一定範囲を超えたら方向を反転する
       if (this.group.rotation.y >= 1.2 || this.group.rotation.y <= -1.2) {
@@ -474,9 +467,10 @@ class ThreeApp {
     this.renderer.render(this.scene, this.camera);
   }
 
+  /**
+   * アニメーション処理
+   */
   animation() {
-    this.stats.begin();
     this.render();
-    this.stats.end();
   }
 }
