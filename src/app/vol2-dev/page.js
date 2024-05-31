@@ -56,7 +56,7 @@ class ThreeApp {
      * 描画する空間のニアクリップ面（最近面）
      * 表示するスタートライン
      */
-    near: 1,
+    near: 0.1,
     /*
      * 描画する空間のファークリップ面（最遠面）
      * 表示するエンドライン
@@ -162,7 +162,7 @@ class ThreeApp {
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
     this.renderer.setPixelRatio(ratio);
-    this.renderer.setSize(width - ratio, height - ratio);
+    this.renderer.setSize(width, height);
     wrapper.appendChild(this.renderer.domElement);
     // レンダラーの自動クリアを無効にする
     this.renderer.autoClear = false;
@@ -183,7 +183,9 @@ class ThreeApp {
       ThreeApp.CAMERA_PARAM.near,
       ThreeApp.CAMERA_PARAM.far
     );
-    this.camera.position.z = 200;
+    // this.camera.position.z = 200;
+    this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
+    this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
     // マテリアル
     this.material = new THREE.MeshToonMaterial(ThreeApp.MATERIAL_PARAM);
@@ -286,9 +288,19 @@ class ThreeApp {
       },
       false
     );
-    window.addEventListener("resize", () => this.onWindowResize.bind(this));
-    //ポストプロセシングの初期化
-    this.initPostprocessing(width, height);
+
+    window.addEventListener(
+      "resize",
+      () => {
+        this.renderer.setSize(width, height);
+        this.camera.aspect = this.aspect;
+        this.camera.updateProjectionMatrix();
+      },
+      false
+    );
+    // window.addEventListener("resize", () => this.onWindowResize.bind(this));
+    // //ポストプロセシングの初期化
+    // this.initPostprocessing(width, height);
   }
 
   onWindowResize() {
