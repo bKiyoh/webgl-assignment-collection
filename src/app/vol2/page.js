@@ -372,9 +372,9 @@ class ThreeApp {
     this.controls.update();
 
     // 羽を回転
-    this.bladesGroup.rotation.z += 0.075;
+    this.bladesGroup.rotation.z += 0.035;
     // 首振り
-    this.swingGroup.rotation.y += 0.005 * this.rotationDirection;
+    this.swingGroup.rotation.y += 0.002 * this.rotationDirection;
     // 首振りが一定範囲を超えたら方向を反転する
     if (this.swingGroup.rotation.y >= 1 || this.swingGroup.rotation.y <= -1) {
       this.rotationDirection *= -1;
