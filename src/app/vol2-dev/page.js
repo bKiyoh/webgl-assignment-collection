@@ -40,7 +40,7 @@ class ThreeApp {
     fovy: 60,
     near: 0.1,
     far: 3000,
-    position: new THREE.Vector3(60, -100, 260),
+    position: new THREE.Vector3(180, -700, 500),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -84,8 +84,9 @@ class ThreeApp {
     this.clipPosition = new THREE.Vector4(); // クリップ空間の位置
     this.screenSpacePosition = new THREE.Vector3(); // スクリーンスペースの位置
     this.postprocessing = { enabled: true }; // ポストプロセッシング
+    this.rotationDirection = 1; // 初期の回転方向
     this.material = null; // マテリアル
-    this.group = null; // グループ
+    this.swingGroup = null; // 首振りグループ
     this.bladesGroup = null; // 羽グループ
     this.isDown = false; // キーの押下状態用フラグ
 
@@ -109,21 +110,25 @@ class ThreeApp {
 
     this.scene = new THREE.Scene();
 
+    // グループ
+    this.swingGroup = new THREE.Group();
+    this.scene.add(this.swingGroup);
+    this.bladesGroup = new THREE.Group();
+
     // マテリアル
     this.material = new THREE.MeshToonMaterial(ThreeApp.MATERIAL_PARAM);
 
     // ジオメトリー
-    const baseGeometry = new THREE.CylinderGeometry(8, 60, 30, 64);
-    const shaftGeometry = new THREE.CylinderGeometry(8, 8, 150, 64);
-    const armGeometry = new THREE.CapsuleGeometry(8, 40, 32, 64);
-
-    this.rotationDirection = 1; // 初期の回転方向
+    const shaftGeometry = new THREE.CylinderGeometry(8, 18, 500, 64);
+    const armGeometry = new THREE.CapsuleGeometry(8, 40, 1, 64);
 
     // カスタムジオメトリで羽を作成
     const bladeShape = new THREE.Shape();
-    bladeShape.moveTo(0, 0);
-    bladeShape.lineTo(70, 5);
-    bladeShape.quadraticCurveTo(60, 30, 30, 15);
+    bladeShape.moveTo(0, 0); // 開始点
+    bladeShape.bezierCurveTo(10, 0, 20, 5, 25, 30); // 滑らかな曲線を追加
+    bladeShape.bezierCurveTo(30, 50, 35, 80, 20, 100);
+    bladeShape.bezierCurveTo(5, 120, 0, 90, 0, 60);
+    bladeShape.lineTo(0, 0); // 始点に戻る
 
     // エクストルード設定
     const extrudeSettings = {
@@ -141,39 +146,30 @@ class ThreeApp {
       extrudeSettings
     );
 
-    // グループ
-    this.group = new THREE.Group();
-    this.scene.add(this.group);
-    this.bladesGroup = new THREE.Group();
-
     // 羽を作成し、羽グループに追加
-    for (let i = 0; i < 3; i++) {
+    const blades = 3;
+    for (let i = 0; i < blades; i++) {
       const blade = new THREE.Mesh(bladeGeometry, this.material);
-      blade.rotation.z = i * ((2 * Math.PI) / 3); // 120度ずつ回転
+      blade.rotation.z = i * ((2 * Math.PI) / blades); // 120度ずつ回転
       this.bladesGroup.add(blade);
     }
 
     // 羽グループを所定の位置に配置
-    this.bladesGroup.position.set(0, 75, 40);
+    this.bladesGroup.position.set(0, 75, 35);
 
-    // ベース、シャフト、アームメッシュの作成とシーンへの追加
-    const baseMesh = new THREE.Mesh(baseGeometry, this.material);
+    // メッシュ
     const shaftMesh = new THREE.Mesh(shaftGeometry, this.material);
     const armMesh = new THREE.Mesh(armGeometry, this.material);
 
-    // メッシュの位置と回転
-    baseMesh.position.y = -60;
-    // アームメッシュの位置と回転
+    shaftMesh.position.y = -130; // シャフトメッシュの位置
+    // アームメッシュの位置
     armMesh.position.y = 75;
     armMesh.position.z = 20;
     armMesh.rotateX(Math.PI / 2);
 
-    // メッシュをシーンに追加
-    this.scene.add(baseMesh);
     this.scene.add(shaftMesh);
-    // 回転するメッシュをグループに追加
-    this.group.add(armMesh);
-    this.group.add(this.bladesGroup);
+    this.swingGroup.add(armMesh);
+    this.swingGroup.add(this.bladesGroup);
 
     // レンダラー
     this.renderer = new THREE.WebGLRenderer();
@@ -189,21 +185,7 @@ class ThreeApp {
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.minDistance = 50;
-    this.controls.maxDistance = 350;
-
-    // キーの押下や離す操作を検出できるようにする
-    window.addEventListener(
-      "keydown",
-      (keyEvent) => {
-        switch (keyEvent.key) {
-          case " ":
-            this.isDown = !this.isDown;
-            break;
-          default:
-        }
-      },
-      false
-    );
+    this.controls.maxDistance = 500;
 
     window.addEventListener("resize", () => this.onWindowResize());
 
@@ -252,7 +234,7 @@ class ThreeApp {
   }
 
   /**
-   * postprocessingの初期化ß
+   * postprocessingの初期化
    * @param {*} renderTargetWidth
    * @param {*} renderTargetHeight
    * @return {void}
@@ -270,6 +252,7 @@ class ThreeApp {
     );
     this.postprocessing.camera.position.z = 100;
     this.postprocessing.scene.add(this.postprocessing.camera);
+
     // カラーバッファのレンダーターゲットを作成
     this.postprocessing.rtTextureColors = new THREE.WebGLRenderTarget(
       renderTargetWidth,
@@ -278,6 +261,7 @@ class ThreeApp {
         type: THREE.HalfFloatType, // 浮動小数点数のテクスチャタイプ
       }
     );
+
     // 深度バッファのレンダーターゲットを作成
     this.postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget(
       renderTargetWidth,
@@ -295,11 +279,13 @@ class ThreeApp {
         type: THREE.HalfFloatType, // 浮動小数点数のテクスチャタイプ
       }
     );
+
     // ゴッドレイエフェクト用の調整済みレンダーターゲットのサイズを計算
     const adjustedWidth =
       renderTargetWidth * ThreeApp.GODRAY_PARAM.resolutionScale;
     const adjustedHeight =
       renderTargetHeight * ThreeApp.GODRAY_PARAM.resolutionScale;
+
     // ゴッドレイエフェクト用のレンダーターゲットを作成
     this.postprocessing.rtTextureGodRays1 = new THREE.WebGLRenderTarget(
       adjustedWidth,
@@ -315,6 +301,7 @@ class ThreeApp {
         type: THREE.HalfFloatType, // 浮動小数点数のテクスチャタイプ
       }
     );
+
     // ゴッドレイ深度マスクシェーダーの設定
     const godraysMaskShader = GodRaysDepthMaskShader;
     this.postprocessing.godrayMaskUniforms = THREE.UniformsUtils.clone(
@@ -325,6 +312,7 @@ class ThreeApp {
       vertexShader: godraysMaskShader.vertexShader,
       fragmentShader: godraysMaskShader.fragmentShader,
     });
+
     // ゴッドレイ生成シェーダーの設定
     const godraysGenShader = GodRaysGenerateShader;
     this.postprocessing.godrayGenUniforms = THREE.UniformsUtils.clone(
@@ -335,6 +323,7 @@ class ThreeApp {
       vertexShader: godraysGenShader.vertexShader,
       fragmentShader: godraysGenShader.fragmentShader,
     });
+
     // ゴッドレイ合成シェーダーの設定
     const godraysCombineShader = GodRaysCombineShader;
     this.postprocessing.godrayCombineUniforms = THREE.UniformsUtils.clone(
@@ -345,6 +334,7 @@ class ThreeApp {
       vertexShader: godraysCombineShader.vertexShader,
       fragmentShader: godraysCombineShader.fragmentShader,
     });
+
     // ゴッドレイのフェイクサンシェーダーの設定
     const godraysFakeSunShader = GodRaysFakeSunShader;
     this.postprocessing.godraysFakeSunUniforms = THREE.UniformsUtils.clone(
@@ -355,6 +345,7 @@ class ThreeApp {
       vertexShader: godraysFakeSunShader.vertexShader,
       fragmentShader: godraysFakeSunShader.fragmentShader,
     });
+
     // フェイクサンの背景色と太陽の色を設定
     this.postprocessing.godraysFakeSunUniforms.bgColor.value.setHex(
       ThreeApp.GODRAY_PARAM.bgColor
@@ -362,8 +353,10 @@ class ThreeApp {
     this.postprocessing.godraysFakeSunUniforms.sunColor.value.setHex(
       ThreeApp.GODRAY_PARAM.sunColor
     );
+
     // ゴッドレイの強度を設定
     this.postprocessing.godrayCombineUniforms.fGodRayIntensity.value = 0.75;
+
     // ゴッドレイ生成用の四角形メッシュを作成し、ポストプロセッシングシーンに追加
     this.postprocessing.quad = new THREE.Mesh(
       new THREE.PlaneGeometry(1.0, 1.0),
@@ -377,15 +370,14 @@ class ThreeApp {
   animate() {
     requestAnimationFrame(() => this.animate());
     this.controls.update();
-    // フラグに応じてオブジェクトの状態を変化させる
-    if (this.isDown === true) {
-      this.bladesGroup.rotation.z += 0.2;
-      this.group.rotation.y += 0.005 * this.rotationDirection;
 
-      // 回転角度が一定範囲を超えたら方向を反転する
-      if (this.group.rotation.y >= 1 || this.group.rotation.y <= -1) {
-        this.rotationDirection *= -1;
-      }
+    // 羽を回転
+    this.bladesGroup.rotation.z += 0.075;
+    // 首振り
+    this.swingGroup.rotation.y += 0.005 * this.rotationDirection;
+    // 首振りが一定範囲を超えたら方向を反転する
+    if (this.swingGroup.rotation.y >= 1 || this.swingGroup.rotation.y <= -1) {
+      this.rotationDirection *= -1;
     }
     this.render();
   }
