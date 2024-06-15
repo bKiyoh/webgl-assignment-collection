@@ -38,13 +38,21 @@ export default function Page() {
  */
 class ThreeApp {
   /**
-   * 月に掛けるスケール @@@
+   * 月に掛けるスケール
    */
   static MOON_SCALE = 0.27;
   /**
-   * 月と地球の間の距離 @@@
+   * 月と地球の間の距離
    */
   static MOON_DISTANCE = 3.0;
+  /**
+   * 人工衛星の移動速度
+   */
+  static SATELLITE_SPEED = 0.05;
+  /**
+   * 人工衛星の曲がる力
+   */
+  static SATELLITE_TURN_SCALE = 0.1;
   /**
    * カメラ定義のための定数
    * NOTE: アスペクト比は引数の値を使用する
@@ -116,6 +124,7 @@ class ThreeApp {
   controls; // オービットコントロール
   axesHelper; // 軸ヘルパー
   isDown; // キーの押下状態用フラグ
+  clock; // 時間管理用
   sphereGeometry; // ジオメトリ
   earth; // 地球
   earthMaterial; // 地球用マテリアル
@@ -123,6 +132,9 @@ class ThreeApp {
   moon; // 月
   moonMaterial; // 月用マテリアル
   moonTexture; // 月用テクスチャ
+  satellite; // 人工衛星
+  satelliteMaterial; // 人工衛星用マテリアル
+  satelliteDirection; // 人工衛星の進行方向
 
   /**
    * コンストラクタ
@@ -162,6 +174,7 @@ class ThreeApp {
       },
       false
     );
+
     window.addEventListener(
       "resize",
       () => {
@@ -256,15 +269,26 @@ class ThreeApp {
     this.earth = new THREE.Mesh(this.sphereGeometry, this.earthMaterial);
     this.scene.add(this.earth);
 
-    // 月のマテリアルとメッシュ @@@
+    // 月のマテリアルとメッシュ
     this.moonMaterial = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
     this.moonMaterial.map = this.moonTexture;
     this.moon = new THREE.Mesh(this.sphereGeometry, this.moonMaterial);
     this.scene.add(this.moon);
-    // 月はやや小さくして、さらに位置も動かす @@@
+    // 月はやや小さくして、さらに位置も動かす
     this.moon.scale.setScalar(ThreeApp.MOON_SCALE);
     this.moon.position.set(ThreeApp.MOON_DISTANCE, 0.0, 0.0);
 
+    // 人工衛星のマテリアルとメッシュ
+    this.satelliteMaterial = new THREE.MeshPhongMaterial({ color: 0xff00dd });
+    this.satellite = new THREE.Mesh(
+      this.sphereGeometry,
+      this.satelliteMaterial
+    );
+    this.scene.add(this.satellite);
+    this.satellite.scale.setScalar(0.1); // より小さく
+    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // +Z の方向に初期位置を設定
+    // 進行方向の初期値（念の為、汎用性を考えて単位化するよう記述）
+    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize();
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
@@ -275,6 +299,9 @@ class ThreeApp {
 
     // キーの押下状態を保持するフラグ
     this.isDown = false;
+
+    // Clock オブジェクトの生成
+    this.clock = new THREE.Clock();
   }
 
   /**
@@ -287,11 +314,50 @@ class ThreeApp {
     // コントロールを更新
     this.controls.update();
 
+    // 人工衛星は月を自動追尾する
+    // (終点 - 始点) という計算を行うことで、２点間を結ぶベクトルを定義
+    const subVector = new THREE.Vector3().subVectors(
+      this.moon.position,
+      this.satellite.position
+    );
+    // 長さに依存せず、向きだけを考えたい場合はベクトルを単位化する
+    subVector.normalize();
+    // 人工衛星の進行方向ベクトルに、向きベクトルを小さくスケールして加算する
+    this.satelliteDirection.add(
+      subVector.multiplyScalar(ThreeApp.SATELLITE_TURN_SCALE)
+    );
+    // 加算したことでベクトルの長さが変化するので、単位化してから人工衛星の座標に加算する
+    this.satelliteDirection.normalize();
+    const direction = this.satelliteDirection.clone();
+    this.satellite.position.add(
+      direction.multiplyScalar(ThreeApp.SATELLITE_SPEED)
+    );
+
+    // 前回のフレームからの経過時間の取得
+    const time = this.clock.getElapsedTime();
+    // 経過時間をそのままラジアンとしてサインとコサインを求める
+    const sin = Math.sin(time);
+    const cos = Math.cos(time);
+    // 月の座標を（XZ 平面に水平に）動かす
+    this.moon.position.x = cos * ThreeApp.MOON_DISTANCE;
+    this.moon.position.z = sin * ThreeApp.MOON_DISTANCE;
+
+    // this.moon.position.set(
+    //   cos * ThreeApp.MOON_DISTANCE,
+    //   0.0,
+    //   sin * ThreeApp.MOON_DISTANCE
+    // );
+
     // フラグに応じてオブジェクトの状態を変化させる
     if (this.isDown === true) {
       this.earth.rotation.y += 0.05;
-      this.moon.rotation.y += 0.05;
+      this.moon.position.y += 0.02 * ThreeApp.MOON_DISTANCE;
+    } else {
+      if (this.moon.position.y > 0.0) {
+        this.moon.position.y -= 0.05;
+      }
     }
+
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
   }
