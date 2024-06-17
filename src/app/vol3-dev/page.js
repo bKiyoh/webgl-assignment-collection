@@ -293,9 +293,10 @@ class ThreeApp {
 
     const time = this.clock.getElapsedTime();
     this.mArray.forEach((item, index) => {
-      const angle = time + index * ((2 * Math.PI) / this.mArray.length);
-      item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
-      item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      const initialPosition = this.initialMoonPositions[index];
+      const distance = initialPosition.distanceTo(new THREE.Vector3(0, 0, 0));
+      item.m.position.x = Math.cos(time + index * 0.2) * distance;
+      item.m.position.z = Math.sin(time + index * 0.2) * distance;
     });
 
     this.composer.render();
