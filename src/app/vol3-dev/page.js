@@ -8,23 +8,28 @@ import { UnrealBloomPass } from "@/lib/threeJs/UnrealBloomPass.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
+
+  // ThreeAppの初期化とロードを行う関数
   const initAndLoad = async (app) => {
-    await app.load();
-    app.init();
-    app.render();
+    await app.load(); // アセットのロードを待機
+    app.init(); // Three.jsの初期化
+    app.render(); // レンダリングの開始
   };
 
+  // コンポーネントのマウント時とアンマウント時の処理
   useEffect(() => {
-    const { innerHeight: height, innerWidth: width } = window;
-    const wrapper = document.querySelector("#webgl");
+    const { innerHeight: height, innerWidth: width } = window; // ウィンドウの高さと幅を取得
+    const wrapper = document.querySelector("#webgl"); // DOMからwebgl要素を取得
     if (wrapper && !initializedRef.current) {
-      const app = new ThreeApp(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+      // まだ初期化されていない場合
+      const app = new ThreeApp(wrapper, width, height); // ThreeAppのインスタンスを作成
+      initAndLoad(app); // ThreeAppの初期化とロード
+      initializedRef.current = true; // 初期化済みフラグを立てる
     }
 
     return () => {
       if (wrapper) {
+        // アンマウント時にwebgl要素をクリア
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
         }
@@ -32,15 +37,17 @@ export default function Page() {
     };
   }, []);
 
-  return <div id="webgl" />;
+  return <div id="webgl" />; // webgl要素をレンダリング
 }
 
+// Three.jsのアプリケーションクラスの定義
 class ThreeApp {
-  static MOON_SCALE = 0.27;
-  static MOON_DISTANCE = 1.0;
-  static SATELLITE_SPEED = 0.05;
-  static SATELLITE_TURN_SCALE = 0.1;
+  static MOON_SCALE = 0.27; // 月のスケール
+  static MOON_DISTANCE = 3.0; // 地球から月までの距離
+  static SATELLITE_SPEED = 0.05; // 人工衛星の移動速度
+  static SATELLITE_TURN_SCALE = 0.1; // 人工衛星の方向転換のスケール
   static CAMERA_PARAM = {
+    // カメラのパラメータ
     fovy: 60,
     near: 0.1,
     far: 50.0,
@@ -48,63 +55,70 @@ class ThreeApp {
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   static RENDERER_PARAM = {
+    // レンダラのパラメータ
     clearColor: 0x000000,
     rendererRatio: 120,
   };
   static DIRECTIONAL_LIGHT_PARAM = {
+    // 平行光源のパラメータ
     color: 0xffffff,
     intensity: 1.0,
     position: new THREE.Vector3(1.0, 1.0, 1.0),
   };
   static AMBIENT_LIGHT_PARAM = {
+    // 環境光のパラメータ
     color: 0xffffff,
     intensity: 0.3,
   };
   static MATERIAL_PARAM = {
+    // マテリアルのパラメータ
     color: 0x80cbc4,
   };
   static FOG_PARAM = {
+    // フォグのパラメータ
     color: 0xffffff,
     near: 10.0,
     far: 20.0,
   };
 
-  wrapper;
-  width;
-  height;
-  renderer;
-  scene;
-  camera;
-  directionalLight;
-  ambientLight;
-  controls;
-  axesHelper;
-  isDown;
-  clock;
-  sphereGeometry;
-  earth;
-  earthMaterial;
-  earthTexture;
-  moon;
-  moonMaterial;
-  moonTexture;
-  initialMoonPositions;
-  satellite;
-  satelliteMaterial;
-  satelliteDirection;
-  group;
-  composer;
-  renderPass;
-  glitchPass;
-  mArray;
+  wrapper; // canvas の親要素
+  width; // 画面幅
+  height; // 画面高さ
+  renderer; // レンダラ
+  scene; // シーン
+  camera; // カメラ
+  directionalLight; // 平行光源
+  ambientLight; // 環境光
+  controls; // オービットコントロール
+  axesHelper; // 軸ヘルパー
+  isDown; // キーの押下状態用フラグ
+  clock; // 時間管理用
+  sphereGeometry; // 球体のジオメトリ
+  earth; // 地球
+  earthMaterial; // 地球用マテリアル
+  earthTexture; // 地球用テクスチャ
+  moon; // 月
+  moonMaterial; // 月用マテリアル
+  moonTexture; // 月用テクスチャ
+  initialMoonPositions; // 月の初期位置
+  satellite; // 人工衛星
+  satelliteMaterial; // 人工衛星用マテリアル
+  satelliteDirection; // 人工衛星の進行方向
+  group; // グループ
+  composer; // エフェクトコンポーザー
+  renderPass; // レンダーパス
+  glitchPass; // グリッチパス
+  mArray; // 月の配列
 
+  // コンストラクタ
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
     this.width = width;
     this.height = height;
 
-    this.render = this.render.bind(this);
+    this.render = this.render.bind(this); // renderメソッドのthisバインディング
 
+    // キーイベントリスナーの設定
     window.addEventListener(
       "keydown",
       (keyEvent) => {
@@ -125,6 +139,7 @@ class ThreeApp {
       false
     );
 
+    // ウィンドウリサイズ時の処理
     window.addEventListener(
       "resize",
       () => {
@@ -136,22 +151,25 @@ class ThreeApp {
     );
   }
 
+  // アセット（素材）のロードを行うPromise
   load() {
     return new Promise((resolve) => {
       const earthPath = "/earth.jpg";
       const moonPath = "/1.jpg";
       const loader = new THREE.TextureLoader();
       loader.load(earthPath, (earthTexture) => {
-        this.earthTexture = earthTexture;
+        this.earthTexture = earthTexture; // 地球テクスチャをロード
         loader.load(moonPath, (moonTexture) => {
-          this.moonTexture = moonTexture;
+          this.moonTexture = moonTexture; // 月テクスチャをロード
           resolve();
         });
       });
     });
   }
 
+  // 初期化処理
   init() {
+    // レンダラの設定
     const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setClearColor(color);
@@ -161,6 +179,7 @@ class ThreeApp {
     );
     this.wrapper.appendChild(this.renderer.domElement);
 
+    // シーンの設定
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(
       ThreeApp.FOG_PARAM.color,
@@ -168,6 +187,7 @@ class ThreeApp {
       ThreeApp.FOG_PARAM.far
     );
 
+    // カメラの設定
     this.aspect = this.width / this.height;
     this.camera = new THREE.PerspectiveCamera(
       ThreeApp.CAMERA_PARAM.fovy,
@@ -178,20 +198,24 @@ class ThreeApp {
     this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
 
+    // 平行光源の設定
     this.directionalLight = new THREE.PointLight(0xffffff, 100);
     this.directionalLight.position.copy(
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
     );
     this.scene.add(this.directionalLight);
 
+    // 環境光の設定
     this.ambientLight = new THREE.HemisphereLight(
       ThreeApp.AMBIENT_LIGHT_PARAM.color,
       ThreeApp.AMBIENT_LIGHT_PARAM.intensity
     );
     this.scene.add(this.ambientLight);
 
+    // 球体のジオメトリの設定
     this.sphereGeometry = new THREE.SphereGeometry(0.5, 32, 32);
 
+    // 地球のマテリアルとメッシュの設定
     this.earthMaterial = new THREE.MeshBasicMaterial({ color: 0x95ccff });
     this.earthMaterial.map = this.moonTexture;
     this.earth = new THREE.Mesh(this.sphereGeometry, this.earthMaterial);
@@ -200,9 +224,10 @@ class ThreeApp {
     this.mArray = [];
     this.initialMoonPositions = [];
 
-    const moonCount = 20;
-    const angleStep = (2 * Math.PI) / moonCount;
+    const moonCount = 6; // 月の数
+    const angleStep = (2 * Math.PI) / moonCount; // 月を配置する角度のステップ
 
+    // 月の配置
     for (let i = 0; i < moonCount; i++) {
       const color = new THREE.Color();
       color.setHSL(Math.random(), 0.7, Math.random() * 1 + 0.05);
@@ -212,19 +237,19 @@ class ThreeApp {
       this.moon = new THREE.Mesh(this.sphereGeometry, this.moonMaterial);
       this.moon.scale.setScalar(ThreeApp.MOON_SCALE);
 
-      const angle = i * angleStep;
-      const xPosition = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
-      const zPosition = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      const angle = i * angleStep; // 月の配置角度を計算
+      const xPosition = Math.cos(angle) * ThreeApp.MOON_DISTANCE; // x座標を計算
+      const zPosition = Math.sin(angle) * ThreeApp.MOON_DISTANCE; // z座標を計算
 
-      this.moon.position.set(xPosition, 0.0, zPosition);
-      this.initialMoonPositions.push(this.moon.position.clone());
+      this.moon.position.set(xPosition, 0.0, zPosition); // 月の位置を設定
+      this.initialMoonPositions.push(this.moon.position.clone()); // 初期位置を保存
       const m = {
         m: this.moon,
         distance: ThreeApp.MOON_DISTANCE,
         direction: true,
       };
-      this.mArray.push(m);
-      this.scene.add(this.moon);
+      this.mArray.push(m); // 月を配列に追加
+      this.scene.add(this.moon); // 月をシーンに追加
     }
 
     this.group = new THREE.Group();
@@ -238,19 +263,18 @@ class ThreeApp {
       this.sphereGeometry,
       this.satelliteMaterial
     );
-    this.scene.add(this.satellite);
-    this.satellite.scale.setScalar(0.1);
-    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE);
-    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize();
+    this.satellite.scale.setScalar(0.1); // 人工衛星のスケールを設定
+    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // 人工衛星の初期位置を設定
+    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize(); // 人工衛星の進行方向を設定
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement); // オービットコントロールの設定
 
     const axesBarLength = 5.0;
     this.axesHelper = new THREE.AxesHelper(axesBarLength);
 
     const params = {
       threshold: 0,
-      strength: 2.5,
+      strength: 2,
       radius: 1,
       exposure: 1.5,
     };
@@ -262,20 +286,21 @@ class ThreeApp {
     bloomPass.strength = params.strength;
     bloomPass.radius = params.radius;
 
-    this.composer = new EffectComposer(this.renderer);
-    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer = new EffectComposer(this.renderer); // エフェクトコンポーザーの設定
+    this.renderPass = new RenderPass(this.scene, this.camera); // レンダーパスの設定
     this.composer.addPass(this.renderPass);
     this.composer.addPass(bloomPass);
 
-    this.isDown = false;
+    this.isDown = false; // キーの押下状態フラグを初期化
 
-    this.clock = new THREE.Clock();
+    this.clock = new THREE.Clock(); // Clockオブジェクトの生成
   }
 
+  // 描画処理
   render() {
-    requestAnimationFrame(this.render);
+    requestAnimationFrame(this.render); // 次のフレームでrenderを呼び出す
 
-    this.controls.update();
+    this.controls.update(); // コントロールの更新
 
     const subVector = new THREE.Vector3().subVectors(
       this.moon.position,
@@ -291,14 +316,13 @@ class ThreeApp {
       direction.multiplyScalar(ThreeApp.SATELLITE_SPEED)
     );
 
-    const time = this.clock.getElapsedTime();
+    const time = this.clock.getElapsedTime(); // 経過時間を取得
     this.mArray.forEach((item, index) => {
-      const initialPosition = this.initialMoonPositions[index];
-      const distance = initialPosition.distanceTo(new THREE.Vector3(0, 0, 0));
-      item.m.position.x = Math.cos(time + index * 0.2) * distance;
-      item.m.position.z = Math.sin(time + index * 0.2) * distance;
+      const angle = time + index * ((2 * Math.PI) / this.mArray.length); // 各月の位置を計算
+      item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
+      item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
     });
 
-    this.composer.render();
+    this.composer.render(); // シーンをレンダリング
   }
 }
