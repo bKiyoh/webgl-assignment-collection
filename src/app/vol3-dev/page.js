@@ -133,7 +133,8 @@ class ThreeApp {
   composer; // エフェクトコンポーザー
   renderPass; // レンダーパス
   glitchPass; // グリッチパス
-  mArray; // 月の配列
+  spheres_horizontal; // 月の配列
+  spheres_diagonal; // 月の配列
   moonCount;
 
   constructor(wrapper, width, height) {
@@ -242,7 +243,7 @@ class ThreeApp {
     this.earth = new THREE.Mesh(this.sphereGeometry, this.earthMaterial);
     this.scene.add(this.earth);
 
-    this.mArray = [];
+    this.spheres_horizontal = [];
     this.initialMoonPositions = [];
 
     // NOTE: 等間隔でオブジェクトを配置するために円の全周（2πラジアン）をオブジェクトの数で割る
@@ -271,18 +272,36 @@ class ThreeApp {
       // y座標は0に固定し、x, z座標をセット
       this.moon.position.set(xPosition, 0.0, zPosition);
       this.initialMoonPositions.push(this.moon.position.clone()); // 初期位置を保存
+      const sphere = {
+        m: this.moon,
+        distance: ThreeApp.MOON_DISTANCE,
+        direction: true,
+      };
+      this.spheres_horizontal.push(sphere); // 月を配列に追加
+      this.scene.add(this.moon); // 月をシーンに追加
+    }
+
+    this.spheres_diagonal = [];
+    for (let i = 0; i < ThreeApp.MOON_COUNT; i++) {
+      const color = new THREE.Color();
+      color.setHSL(Math.random(), 0.7, Math.random() * 1 + 0.05);
+      this.moonMaterial = new THREE.MeshBasicMaterial({ color: color });
+      this.moonMaterial.map = this.moonTexture; // 画像貼り付け
+      this.moon = new THREE.Mesh(this.sphereGeometry, this.moonMaterial);
+      this.moon.scale.setScalar(ThreeApp.MOON_SCALE); // オブジェクトの大きさ調整
+      const angle = i * angleStep; // i番目の月の配置角度を計算
+      const xPosition = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
+      const zPosition = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      this.moon.position.set(xPosition, xPosition, zPosition);
+      this.initialMoonPositions.push(this.moon.position.clone()); // 初期位置を保存
       const m = {
         m: this.moon,
         distance: ThreeApp.MOON_DISTANCE,
         direction: true,
       };
-      this.mArray.push(m); // 月を配列に追加
+      this.spheres_horizontal.push(m); // 月を配列に追加
       this.scene.add(this.moon); // 月をシーンに追加
     }
-
-    this.group = new THREE.Group();
-    this.scene.add(this.group);
-    this.group.add(this.moon);
 
     this.satelliteMaterial = new THREE.MeshBasicMaterial(
       ThreeApp.MATERIAL_PARAM
@@ -345,11 +364,18 @@ class ThreeApp {
     );
 
     const time = this.clock.getElapsedTime(); // 経過時間を取得
-    this.mArray.forEach((item, index) => {
+    this.spheres_horizontal.forEach((item, index) => {
       // 各月を円周上に等間隔に配置するための角度を計算
       // 'time' は月が時間と共に回転するようにし、'index' を使って各月が等間隔に配置されるようにする
       const angle = time + index * ((2 * Math.PI) / ThreeApp.MOON_COUNT); // 各月の位置を計算
       item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
+      item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+    });
+
+    this.spheres_diagonal.forEach((item, index) => {
+      const angle = time + index * ((2 * Math.PI) / ThreeApp.MOON_COUNT); // 各月の位置を計算
+      item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
+      item.m.position.y = Math.sin(angle) * ThreeApp.MOON_DISTANCE; // y座標で動くように変更
       item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
     });
 
