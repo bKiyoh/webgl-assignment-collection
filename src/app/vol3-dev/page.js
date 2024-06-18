@@ -39,13 +39,13 @@ export default function Page() {
 
 class ThreeApp {
   /**
-   * 月のスケール
+   * 球体のスケール
    */
-  static MOON_SCALE = 0.27;
+  static SPHERE_SCALE = 0.27;
   /**
-   * 地球から月までの距離
+   * 地球から球体までの距離
    */
-  static MOON_DISTANCE = 3.0;
+  static SPHERE_DISTANCE = 3.0;
   /**
    * 人工衛星の移動速度
    */
@@ -61,7 +61,7 @@ class ThreeApp {
     fovy: 60,
     near: 0.1,
     far: 50.0,
-    position: new THREE.Vector3(2, 1, 8),
+    position: new THREE.Vector3(8, 0, 0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -102,11 +102,11 @@ class ThreeApp {
   };
 
   /**
-   * 月の数
+   * 球体の数
    */
-  static MOON_COUNT = 6;
+  static SPHERE_COUNT = 10;
 
-  wrapper; // canvas の親要素
+  wrapper; // canvasの親要素
   width; // 画面幅
   height; // 画面高さ
   renderer; // レンダラ
@@ -122,10 +122,10 @@ class ThreeApp {
   earth; // 地球
   earthMaterial; // 地球用マテリアル
   earthTexture; // 地球用テクスチャ
-  moon; // 月
-  moonMaterial; // 月用マテリアル
-  moonTexture; // 月用テクスチャ
-  initialMoonPositions; // 月の初期位置
+  sphere; // 球体
+  sphereMaterial; // 球体マテリアル
+  sphereTexture; // 球体テクスチャ
+  initialSpherePositions; // 球体の初期位置
   satellite; // 人工衛星
   satelliteMaterial; // 人工衛星用マテリアル
   satelliteDirection; // 人工衛星の進行方向
@@ -133,9 +133,10 @@ class ThreeApp {
   composer; // エフェクトコンポーザー
   renderPass; // レンダーパス
   glitchPass; // グリッチパス
-  spheres_horizontal; // 月の配列
-  spheres_diagonal; // 月の配列
-  moonCount;
+  spheres_horizontal; // 球体の配列
+  spheres_diagonal; // 球体の配列 斜め
+  spheres_diagonal_reverse; // 球体の配列 斜めの逆
+  sphereCount; // 球体の数
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -178,10 +179,10 @@ class ThreeApp {
   // アセット（素材）のロードを行うPromise
   load() {
     return new Promise((resolve) => {
-      const moonPath = "/1.jpg";
+      const spherePath = "/sphere.jpg";
       const loader = new THREE.TextureLoader();
-      loader.load(moonPath, (moonTexture) => {
-        this.moonTexture = moonTexture; // 月テクスチャをロード
+      loader.load(spherePath, (sphereTexture) => {
+        this.sphereTexture = sphereTexture; // 球体テクスチャをロード
         resolve();
       });
     });
@@ -239,68 +240,93 @@ class ThreeApp {
 
     // 地球のマテリアルとメッシュの設定
     this.earthMaterial = new THREE.MeshBasicMaterial({ color: 0x95ccff });
-    this.earthMaterial.map = this.moonTexture;
+    this.earthMaterial.map = this.sphereTexture;
     this.earth = new THREE.Mesh(this.sphereGeometry, this.earthMaterial);
     this.scene.add(this.earth);
 
-    this.spheres_horizontal = [];
-    this.initialMoonPositions = [];
-
     // NOTE: 等間隔でオブジェクトを配置するために円の全周（2πラジアン）をオブジェクトの数で割る
-    const angleStep = (2 * Math.PI) / ThreeApp.MOON_COUNT; // 月を配置する角度のステップ
+    const angleStep = (2 * Math.PI) / ThreeApp.SPHERE_COUNT; // 球体を配置する角度のステップ
 
-    // 月の配置
-    for (let i = 0; i < ThreeApp.MOON_COUNT; i++) {
+    // グループ
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
+
+    this.initialSpherePositions = [];
+    this.spheres_horizontal = [];
+    // 球体の配置
+    for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
       // 色をランダムで生成
       const color = new THREE.Color();
       color.setHSL(Math.random(), 0.7, Math.random() * 1 + 0.05);
-      this.moonMaterial = new THREE.MeshBasicMaterial({ color: color });
-      this.moonMaterial.map = this.moonTexture; // 画像貼り付け
-      this.moon = new THREE.Mesh(this.sphereGeometry, this.moonMaterial);
-      this.moon.scale.setScalar(ThreeApp.MOON_SCALE); // オブジェクトの大きさ調整
-      const angle = i * angleStep; // i番目の月の配置角度を計算
+      this.sphereMaterial = new THREE.MeshBasicMaterial({ color: color });
+      this.sphereMaterial.map = this.sphereTexture; // 画像貼り付け
+      this.sphere = new THREE.Mesh(this.sphereGeometry, this.sphereMaterial);
+      this.sphere.scale.setScalar(ThreeApp.SPHERE_SCALE); // オブジェクトの大きさ調整
+      const angle = i * angleStep; // i番目の球体の配置角度を計算
 
       // 地球から一定の距離 (MOON_DISTANCE) を保つように x座標を計算
-      // cos(angle) を使って、月が地球の周りを回るように x方向の位置を決定
-      const xPosition = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
+      // cos(angle) を使って、球体が地球の周りを回るように x方向の位置を決定
+      const xPosition = Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
 
       // 地球から一定の距離 (MOON_DISTANCE) を保つように z座標を計算
-      // sin(angle) を使って、月が地球の周りを回るように z方向の位置を決定
-      const zPosition = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      // sin(angle) を使って、球体が地球の周りを回るように z方向の位置を決定
+      const zPosition = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
 
-      // 計算された x, z座標を使って月の位置を設定
+      // 計算された x, z座標を使って球体の位置を設定
       // y座標は0に固定し、x, z座標をセット
-      this.moon.position.set(xPosition, 0.0, zPosition);
-      this.initialMoonPositions.push(this.moon.position.clone()); // 初期位置を保存
+      this.sphere.position.set(xPosition, 0.0, zPosition);
+      this.initialSpherePositions.push(this.sphere.position.clone()); // 初期位置を保存
       const sphere = {
-        m: this.moon,
-        distance: ThreeApp.MOON_DISTANCE,
+        m: this.sphere,
+        distance: ThreeApp.SPHERE_DISTANCE,
         direction: true,
       };
-      this.spheres_horizontal.push(sphere); // 月を配列に追加
-      this.scene.add(this.moon); // 月をシーンに追加
+      this.spheres_horizontal.push(sphere); // 球体を配列に追加
+      this.group.add(this.sphere); // 球体をシーンに追加
     }
 
     this.spheres_diagonal = [];
-    for (let i = 0; i < ThreeApp.MOON_COUNT; i++) {
+    for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
       const color = new THREE.Color();
       color.setHSL(Math.random(), 0.7, Math.random() * 1 + 0.05);
-      this.moonMaterial = new THREE.MeshBasicMaterial({ color: color });
-      this.moonMaterial.map = this.moonTexture; // 画像貼り付け
-      this.moon = new THREE.Mesh(this.sphereGeometry, this.moonMaterial);
-      this.moon.scale.setScalar(ThreeApp.MOON_SCALE); // オブジェクトの大きさ調整
-      const angle = i * angleStep; // i番目の月の配置角度を計算
-      const xPosition = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
-      const zPosition = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
-      this.moon.position.set(xPosition, xPosition, zPosition);
-      this.initialMoonPositions.push(this.moon.position.clone()); // 初期位置を保存
+      this.sphereMaterial = new THREE.MeshBasicMaterial({ color: color });
+      this.sphereMaterial.map = this.sphereTexture;
+      this.sphere = new THREE.Mesh(this.sphereGeometry, this.sphereMaterial);
+      this.sphere.scale.setScalar(ThreeApp.SPHERE_SCALE);
+      const angle = i * angleStep;
+      const xPosition = Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
+      const zPosition = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      this.sphere.position.set(xPosition, 0.0, zPosition);
+      this.initialSpherePositions.push(this.sphere.position.clone());
       const m = {
-        m: this.moon,
-        distance: ThreeApp.MOON_DISTANCE,
+        m: this.sphere,
+        distance: ThreeApp.SPHERE_DISTANCE,
         direction: true,
       };
-      this.spheres_horizontal.push(m); // 月を配列に追加
-      this.scene.add(this.moon); // 月をシーンに追加
+      this.spheres_diagonal.push(m);
+      this.group.add(this.sphere);
+    }
+
+    this.spheres_diagonal_reverse = [];
+    for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
+      const color = new THREE.Color();
+      color.setHSL(Math.random(), 0.7, Math.random() * 1 + 0.05);
+      this.sphereMaterial = new THREE.MeshBasicMaterial({ color: color });
+      this.sphereMaterial.map = this.sphereTexture;
+      this.sphere = new THREE.Mesh(this.sphereGeometry, this.sphereMaterial);
+      this.sphere.scale.setScalar(ThreeApp.SPHERE_SCALE);
+      const angle = i * angleStep;
+      const xPosition = -Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
+      const zPosition = -Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      this.sphere.position.set(xPosition, xPosition, zPosition);
+      this.initialSpherePositions.push(this.sphere.position.clone());
+      const m = {
+        m: this.sphere,
+        distance: ThreeApp.SPHERE_DISTANCE,
+        direction: true,
+      };
+      this.spheres_diagonal_reverse.push(m);
+      this.group.add(this.sphere);
     }
 
     this.satelliteMaterial = new THREE.MeshBasicMaterial(
@@ -311,7 +337,7 @@ class ThreeApp {
       this.satelliteMaterial
     );
     this.satellite.scale.setScalar(0.1); // 人工衛星のスケールを設定
-    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // 人工衛星の初期位置を設定
+    this.satellite.position.set(0.0, 0.0, ThreeApp.SPHERE_DISTANCE); // 人工衛星の初期位置を設定
     this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize(); // 人工衛星の進行方向を設定
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement); // オービットコントロールの設定
@@ -350,7 +376,7 @@ class ThreeApp {
     this.controls.update(); // コントロールの更新
 
     const subVector = new THREE.Vector3().subVectors(
-      this.moon.position,
+      this.sphere.position,
       this.satellite.position
     );
     subVector.normalize();
@@ -365,19 +391,30 @@ class ThreeApp {
 
     const time = this.clock.getElapsedTime(); // 経過時間を取得
     this.spheres_horizontal.forEach((item, index) => {
-      // 各月を円周上に等間隔に配置するための角度を計算
-      // 'time' は月が時間と共に回転するようにし、'index' を使って各月が等間隔に配置されるようにする
-      const angle = time + index * ((2 * Math.PI) / ThreeApp.MOON_COUNT); // 各月の位置を計算
-      item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
-      item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      // 各球体を円周上に等間隔に配置するための角度を計算
+      // 'time' は球体が時間と共に回転するようにし、'index' を使って各球体が等間隔に配置されるようにする
+      const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT)); // 各球体の位置を計算
+      item.m.position.x = Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.z = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
     });
 
     this.spheres_diagonal.forEach((item, index) => {
-      const angle = time + index * ((2 * Math.PI) / ThreeApp.MOON_COUNT); // 各月の位置を計算
-      item.m.position.x = Math.cos(angle) * ThreeApp.MOON_DISTANCE;
-      item.m.position.y = Math.sin(angle) * ThreeApp.MOON_DISTANCE; // y座標で動くように変更
-      item.m.position.z = Math.sin(angle) * ThreeApp.MOON_DISTANCE;
+      const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
+      item.m.position.x = Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.z = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.y = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
     });
+
+    this.spheres_diagonal_reverse.forEach((item, index) => {
+      const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
+      item.m.position.x = -Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.z = -Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.y = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+    });
+
+    if (this.isDown) {
+      this.group.rotation.y += 5;
+    }
 
     this.composer.render(); // シーンをレンダリング
   }
