@@ -242,16 +242,18 @@ class ThreeApp {
     this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverseM1);
     this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverseM2);
 
-    this.satelliteMaterial = new THREE.MeshBasicMaterial(
-      ThreeApp.MATERIAL_PARAM
-    );
+    // 人工衛星のマテリアルとメッシュ
+    this.satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
     this.satellite = new THREE.Mesh(
       this.sphereGeometry,
       this.satelliteMaterial
     );
-    this.satellite.scale.setScalar(0.1); // 人工衛星のスケールを設定
-    this.satellite.position.set(0.0, 0.0, ThreeApp.SPHERE_DISTANCE); // 人工衛星の初期位置を設定
-    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize(); // 人工衛星の進行方向を設定
+    this.scene.add(this.satellite);
+    // this.satellite.scale.setScalar(0.1); // より小さく
+    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // +Z の方向に初期位置を設定
+    this.satellite.map = this.sphereTexture;
+    // 進行方向の初期値（念の為、汎用性を考えて単位化するよう記述） @@@
+    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize();
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement); // オービットコントロールの設定
 
@@ -290,11 +292,11 @@ class ThreeApp {
       const color = new THREE.Color();
       color.setHSL(
         Math.random() * (0.75 - 0.5) + 0.5, // 色相: 0.5から0.75の範囲でランダム
-        0.7, // 彩度: 0.7
+        0.6, // 彩度
         Math.random() * 0.8 + 0.05 // 明度: 0.05から0.85の範囲でランダム
       );
       if (colorFlg) {
-        color.setHSL(0.9, 0.7, Math.random() * 0.95 + 0.05);
+        color.setHSL(0.9, 0.6, Math.random() * 0.95 + 0.05);
       }
       const sphereMaterial = new THREE.MeshBasicMaterial({ color: color });
       sphereMaterial.map = this.sphereTexture; // 画像貼り付け
@@ -314,21 +316,6 @@ class ThreeApp {
     requestAnimationFrame(this.render); // 次のフレームでrenderを呼び出す
 
     this.controls.update(); // コントロールの更新
-
-    // TODO
-    // const subVector = new THREE.Vector3().subVectors(
-    //   this.sphere.position,
-    //   this.satellite.position
-    // );
-    // subVector.normalize();
-    // this.satelliteDirection.add(
-    //   subVector.multiplyScalar(ThreeApp.SATELLITE_TURN_SCALE)
-    // );
-    // this.satelliteDirection.normalize();
-    // const direction = this.satelliteDirection.clone();
-    // this.satellite.position.add(
-    //   direction.multiplyScalar(ThreeApp.SATELLITE_SPEED)
-    // );
 
     const time = this.clock.getElapsedTime(); // 経過時間を取得
     this.spheres_horizontal.forEach((item, index) => {
@@ -421,6 +408,29 @@ class ThreeApp {
     if (this.isDown) {
       this.group.rotation.y += 5;
     }
+
+    // 人工衛星は月を自動追尾する
+    // (終点 - 始点) という計算を行うことで、２点間を結ぶベクトルを定義
+    const subVector = new THREE.Vector3().subVectors(
+      this.spheres_diagonal3[0].m.position,
+      this.satellite.position
+    );
+    // 長さに依存せず、向きだけを考えたい場合はベクトルを単位化する
+    subVector.normalize();
+    // 人工衛星の進行方向ベクトルに、向きベクトルを小さくスケールして加算する
+    this.satelliteDirection.add(
+      subVector.multiplyScalar(ThreeApp.SATELLITE_TURN_SCALE)
+    );
+    // 現在の人工衛星の座標に、向きベクトルを小さくスケールして加算する
+    this.satellite.position.add(
+      subVector.multiplyScalar(ThreeApp.SATELLITE_SPEED)
+    );
+    // 加算したことでベクトルの長さが変化するので、単位化してから人工衛星の座標に加算する
+    this.satelliteDirection.normalize();
+    const direction = this.satelliteDirection.clone();
+    this.satellite.position.add(
+      direction.multiplyScalar(ThreeApp.SATELLITE_SPEED)
+    );
 
     this.composer.render(); // シーンをレンダリング
   }
