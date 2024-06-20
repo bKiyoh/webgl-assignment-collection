@@ -243,17 +243,6 @@ class ThreeApp {
     this.spheres_diagonal_reverse3 = [];
     this.spheres_diagonal_reverseM1 = [];
     this.spheres_diagonal_reverseM2 = [];
-    this.satellites_diagonal1 = [];
-    this.satellites_diagonal2 = [];
-    this.satellites_diagonal3 = [];
-    this.satellites_diagonalM1 = [];
-    this.satellites_diagonalM2 = [];
-    this.satellites_diagonal_reverse1 = [];
-    this.satellites_diagonal_reverse2 = [];
-    this.satellites_diagonal_reverse3 = [];
-    this.satellites_diagonal_reverseM1 = [];
-    this.satellites_diagonal_reverseM2 = [];
-
     // 球体の初期配置
     this.createSpheres(this.spheres_horizontal, true);
     this.createSpheres(this.spheres_diagonal1);
@@ -267,8 +256,18 @@ class ThreeApp {
     this.createSpheres(this.spheres_diagonal_reverseM1);
     this.createSpheres(this.spheres_diagonal_reverseM2);
 
+    this.satellites_diagonal1 = [];
+    this.satellites_diagonal2 = [];
+    this.satellites_diagonal3 = [];
+    this.satellites_diagonalM1 = [];
+    this.satellites_diagonalM2 = [];
+    this.satellites_diagonal_reverse1 = [];
+    this.satellites_diagonal_reverse2 = [];
+    this.satellites_diagonal_reverse3 = [];
+    this.satellites_diagonal_reverseM1 = [];
+    this.satellites_diagonal_reverseM2 = [];
     // 人工衛星のマテリアルとメッシュ
-    this.createSatellite(this.satellites_diagonal1);
+    this.createSatellite(this.satellites_diagonal1, this.spheres_diagonal1);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement); // オービットコントロールの設定
 
@@ -325,7 +324,7 @@ class ThreeApp {
   /**
    * 衛星を作成して配置する関数
    */
-  createSatellite(satelliteArray) {
+  createSatellite(targetSatellite, targetSphere) {
     for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
       // 人工衛星のマテリアルとメッシュ
       this.satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0xff00dd });
@@ -337,13 +336,13 @@ class ThreeApp {
       this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // +Z の方向に初期位置を設定
       this.satellite.map = this.sphereTexture;
       // 進行方向の初期値（念の為、汎用性を考えて単位化するよう記述
-      this.satelliteDirection = new THREE.Vector3(
+      this.satellite.userData.direction = new THREE.Vector3(
         0.0,
         0.0,
         ThreeApp.MOON_DISTANCE
       ).normalize();
-      satelliteArray.push(this.satellite);
-      console.log(satelliteArray);
+      this.satellite.userData.targetSphere = targetSphere; // 衛星にターゲットの球体を保持
+      targetSatellite.push(this.satellite);
       this.group.add(this.satellite);
     }
   }
@@ -458,6 +457,28 @@ class ThreeApp {
     });
   }
 
+  satelliteAnimation() {
+    this.satellites_diagonal1.forEach((satellite) => {
+      const targetSphere = satellite.userData.targetSphere;
+      targetSphere.forEach((sphere) => {
+        const subVector = new THREE.Vector3().subVectors(
+          sphere.m.position,
+          satellite.position
+        );
+        subVector.normalize();
+        satellite.userData.direction.add(
+          subVector.multiplyScalar(ThreeApp.SATELLITE_PROP.TURN_SCALE)
+        );
+        satellite.position.add(
+          satellite.userData.direction
+            .clone()
+            .multiplyScalar(ThreeApp.SATELLITE_PROP.SPEED)
+        );
+        satellite.userData.direction.normalize();
+      });
+    });
+  }
+
   // 描画処理
   render() {
     requestAnimationFrame(this.render); // 次のフレームでrenderを呼び出す
@@ -466,10 +487,9 @@ class ThreeApp {
 
     this.sphereAnimation();
 
-    this.satelliteAnimation();
-
     if (this.isDown) {
-      this.group.rotation.y += 5;
+      this.group.rotation.y += 0.05;
+      this.satelliteAnimation();
     }
 
     this.composer.render();
