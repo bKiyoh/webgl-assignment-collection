@@ -46,14 +46,18 @@ class ThreeApp {
    * 地球から球体までの距離
    */
   static SPHERE_DISTANCE = 3.0;
-  /**
-   * 人工衛星の移動速度
-   */
-  static SATELLITE_SPEED = 0.05;
-  /**
-   * 人工衛星の方向転換のスケール
-   */
-  static SATELLITE_TURN_SCALE = 0.1;
+
+  static SATELLITE_PROP = {
+    /**
+     * 人工衛星の移動速度
+     */
+    SPEED: 0.1,
+    /**
+     * 人工衛星の曲がる力
+     */
+    TURN_SCALE: 0.1,
+    SIZE_SCALER: 0.3,
+  };
   /**
    * カメラのパラメータ
    */
@@ -122,6 +126,16 @@ class ThreeApp {
   spheres_diagonal_reverseM1; // 球体の配列 斜めの逆
   spheres_diagonal_reverseM2; // 球体の配列 斜めの逆
   sphereCount; // 球体の数
+  satellites_diagonal1; // 球体の配列 斜め
+  satellites_diagonal2; // 球体の配列 斜め
+  satellites_diagonal3; // 球体の配列 斜め
+  satellites_diagonalM1; // 球体の配列 斜め
+  satellites_diagonalM2; // 球体の配列 斜め
+  satellites_diagonal_reverse1; // 球体の配列 斜めの逆
+  satellites_diagonal_reverse2; // 球体の配列 斜めの逆
+  satellites_diagonal_reverse3; // 球体の配列 斜めの逆
+  satellites_diagonal_reverseM1; // 球体の配列 斜めの逆
+  satellites_diagonal_reverseM2; // 球体の配列 斜めの逆
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -219,9 +233,9 @@ class ThreeApp {
 
     // 球体配列の初期化
     this.spheres_horizontal = [];
-    this.spheres_diagonal3 = [];
     this.spheres_diagonal1 = [];
     this.spheres_diagonal2 = [];
+    this.spheres_diagonal3 = [];
     this.spheres_diagonalM1 = [];
     this.spheres_diagonalM2 = [];
     this.spheres_diagonal_reverse1 = [];
@@ -229,36 +243,34 @@ class ThreeApp {
     this.spheres_diagonal_reverse3 = [];
     this.spheres_diagonal_reverseM1 = [];
     this.spheres_diagonal_reverseM2 = [];
+    this.satellites_diagonal1 = [];
+    this.satellites_diagonal2 = [];
+    this.satellites_diagonal3 = [];
+    this.satellites_diagonalM1 = [];
+    this.satellites_diagonalM2 = [];
+    this.satellites_diagonal_reverse1 = [];
+    this.satellites_diagonal_reverse2 = [];
+    this.satellites_diagonal_reverse3 = [];
+    this.satellites_diagonal_reverseM1 = [];
+    this.satellites_diagonal_reverseM2 = [];
+
     // 球体の初期配置
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_horizontal, true);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal1);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal2);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal3);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonalM1);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonalM2);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverse1);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverse2);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverse3);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverseM1);
-    this.createSpheres(ThreeApp.SPHERE_COUNT, this.spheres_diagonal_reverseM2);
+    this.createSpheres(this.spheres_horizontal, true);
+    this.createSpheres(this.spheres_diagonal1);
+    this.createSpheres(this.spheres_diagonal2);
+    this.createSpheres(this.spheres_diagonal3);
+    this.createSpheres(this.spheres_diagonalM1);
+    this.createSpheres(this.spheres_diagonalM2);
+    this.createSpheres(this.spheres_diagonal_reverse1);
+    this.createSpheres(this.spheres_diagonal_reverse2);
+    this.createSpheres(this.spheres_diagonal_reverse3);
+    this.createSpheres(this.spheres_diagonal_reverseM1);
+    this.createSpheres(this.spheres_diagonal_reverseM2);
 
     // 人工衛星のマテリアルとメッシュ
-    this.satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    this.satellite = new THREE.Mesh(
-      this.sphereGeometry,
-      this.satelliteMaterial
-    );
-    this.scene.add(this.satellite);
-    // this.satellite.scale.setScalar(0.1); // より小さく
-    this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // +Z の方向に初期位置を設定
-    this.satellite.map = this.sphereTexture;
-    // 進行方向の初期値（念の為、汎用性を考えて単位化するよう記述） @@@
-    this.satelliteDirection = new THREE.Vector3(0.0, 0.0, 1.0).normalize();
+    this.createSatellite(this.satellites_diagonal1);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement); // オービットコントロールの設定
-
-    const axesBarLength = 5.0;
-    this.axesHelper = new THREE.AxesHelper(axesBarLength);
 
     const params = {
       threshold: 0,
@@ -287,8 +299,8 @@ class ThreeApp {
   /**
    * 球体を作成して配置する関数
    */
-  createSpheres(count, spheresArray, colorFlg) {
-    for (let i = 0; i < count; i++) {
+  createSpheres(spheresArray, colorFlg) {
+    for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
       const color = new THREE.Color();
       color.setHSL(
         Math.random() * (0.75 - 0.5) + 0.5, // 色相: 0.5から0.75の範囲でランダム
@@ -310,13 +322,33 @@ class ThreeApp {
       this.group.add(sphere); // 球体をシーンに追加
     }
   }
+  /**
+   * 衛星を作成して配置する関数
+   */
+  createSatellite(satelliteArray) {
+    for (let i = 0; i < ThreeApp.SPHERE_COUNT; i++) {
+      // 人工衛星のマテリアルとメッシュ
+      this.satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0xff00dd });
+      this.satellite = new THREE.Mesh(
+        this.sphereGeometry,
+        this.satelliteMaterial
+      );
+      this.satellite.scale.setScalar(ThreeApp.SATELLITE_PROP.SIZE_SCALER); // より小さく
+      this.satellite.position.set(0.0, 0.0, ThreeApp.MOON_DISTANCE); // +Z の方向に初期位置を設定
+      this.satellite.map = this.sphereTexture;
+      // 進行方向の初期値（念の為、汎用性を考えて単位化するよう記述
+      this.satelliteDirection = new THREE.Vector3(
+        0.0,
+        0.0,
+        ThreeApp.MOON_DISTANCE
+      ).normalize();
+      satelliteArray.push(this.satellite);
+      console.log(satelliteArray);
+      this.group.add(this.satellite);
+    }
+  }
 
-  // 描画処理
-  render() {
-    requestAnimationFrame(this.render); // 次のフレームでrenderを呼び出す
-
-    this.controls.update(); // コントロールの更新
-
+  sphereAnimation() {
     const time = this.clock.getElapsedTime(); // 経過時間を取得
     this.spheres_horizontal.forEach((item, index) => {
       const distance = 2;
@@ -326,112 +358,120 @@ class ThreeApp {
       item.m.position.x = Math.cos(angle) * distance;
       item.m.position.z = Math.sin(angle) * distance;
     });
-
     this.spheres_diagonal1.forEach((item, index) => {
       const distance = 1;
       const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
       item.m.position.x = Math.cos(angle) * distance;
-      item.m.position.z = Math.sin(angle) * distance - 2;
       item.m.position.y = Math.sin(angle) * distance + 2;
+      item.m.position.z = Math.sin(angle) * distance - 2;
     });
 
     this.spheres_diagonal2.forEach((item, index) => {
       const distance = 2;
       const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
       item.m.position.x = Math.cos(angle) * distance;
-      item.m.position.z = Math.sin(angle) * distance - 1;
       item.m.position.y = Math.sin(angle) * distance + 1;
+      item.m.position.z = Math.sin(angle) * distance - 1;
     });
 
     this.spheres_diagonal3.forEach((item, index) => {
       const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
       item.m.position.x = Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
-      item.m.position.z = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
       item.m.position.y = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.z = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
     });
 
     this.spheres_diagonalM1.forEach((item, index) => {
       const distance = 1;
       const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
       item.m.position.x = Math.cos(angle) * distance;
-      item.m.position.z = Math.sin(angle) * distance + 2;
       item.m.position.y = Math.sin(angle) * distance - 2;
+      item.m.position.z = Math.sin(angle) * distance + 2;
     });
 
     this.spheres_diagonalM2.forEach((item, index) => {
       const distance = 2;
       const angle = -(time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT));
       item.m.position.x = Math.cos(angle) * distance;
-      item.m.position.z = Math.sin(angle) * distance + 1;
       item.m.position.y = Math.sin(angle) * distance - 1;
+      item.m.position.z = Math.sin(angle) * distance + 1;
     });
 
     this.spheres_diagonal_reverse1.forEach((item, index) => {
       const distance = 1;
       const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
       item.m.position.x = -Math.cos(angle) * distance;
-      item.m.position.z = -Math.sin(angle) * distance + 2;
       item.m.position.y = Math.sin(angle) * distance + 2;
+      item.m.position.z = -Math.sin(angle) * distance + 2;
     });
 
     this.spheres_diagonal_reverse2.forEach((item, index) => {
       const distance = 2;
       const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
       item.m.position.x = -Math.cos(angle) * distance;
-      item.m.position.z = -Math.sin(angle) * distance + 1;
       item.m.position.y = Math.sin(angle) * distance + 1;
+      item.m.position.z = -Math.sin(angle) * distance + 1;
     });
 
     this.spheres_diagonal_reverse3.forEach((item, index) => {
       const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
       item.m.position.x = -Math.cos(angle) * ThreeApp.SPHERE_DISTANCE;
-      item.m.position.z = -Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
       item.m.position.y = Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
+      item.m.position.z = -Math.sin(angle) * ThreeApp.SPHERE_DISTANCE;
     });
 
     this.spheres_diagonal_reverseM1.forEach((item, index) => {
       const distance = 1;
       const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
       item.m.position.x = -Math.cos(angle) * distance;
-      item.m.position.z = -Math.sin(angle) * distance - 2;
       item.m.position.y = Math.sin(angle) * distance - 2;
+      item.m.position.z = -Math.sin(angle) * distance - 2;
     });
 
     this.spheres_diagonal_reverseM2.forEach((item, index) => {
       const distance = 2;
       const angle = time + index * ((2 * Math.PI) / ThreeApp.SPHERE_COUNT);
       item.m.position.x = -Math.cos(angle) * distance;
-      item.m.position.z = -Math.sin(angle) * distance - 1;
       item.m.position.y = Math.sin(angle) * distance - 1;
+      item.m.position.z = -Math.sin(angle) * distance - 1;
     });
+  }
+
+  satelliteAnimation() {
+    this.satellites_diagonal1.forEach((item, index) => {
+      const subVector = new THREE.Vector3().subVectors(
+        this.spheres_diagonal_reverseM2[0].m.position,
+        item.position
+      );
+      subVector.normalize();
+      this.satelliteDirection.add(
+        subVector.multiplyScalar(ThreeApp.SATELLITE_PROP.TURN_SCALE)
+      );
+      item.position.add(
+        subVector.multiplyScalar(ThreeApp.SATELLITE_PROP.SPEED)
+      );
+      this.satelliteDirection.normalize();
+      const direction = this.satelliteDirection.clone();
+      item.position.add(
+        direction.multiplyScalar(ThreeApp.SATELLITE_PROP.SPEED)
+      );
+    });
+  }
+
+  // 描画処理
+  render() {
+    requestAnimationFrame(this.render); // 次のフレームでrenderを呼び出す
+
+    this.controls.update(); // コントロールの更新
+
+    this.sphereAnimation();
+
+    this.satelliteAnimation();
 
     if (this.isDown) {
       this.group.rotation.y += 5;
     }
 
-    // 人工衛星は月を自動追尾する
-    // (終点 - 始点) という計算を行うことで、２点間を結ぶベクトルを定義
-    const subVector = new THREE.Vector3().subVectors(
-      this.spheres_diagonal3[0].m.position,
-      this.satellite.position
-    );
-    // 長さに依存せず、向きだけを考えたい場合はベクトルを単位化する
-    subVector.normalize();
-    // 人工衛星の進行方向ベクトルに、向きベクトルを小さくスケールして加算する
-    this.satelliteDirection.add(
-      subVector.multiplyScalar(ThreeApp.SATELLITE_TURN_SCALE)
-    );
-    // 現在の人工衛星の座標に、向きベクトルを小さくスケールして加算する
-    this.satellite.position.add(
-      subVector.multiplyScalar(ThreeApp.SATELLITE_SPEED)
-    );
-    // 加算したことでベクトルの長さが変化するので、単位化してから人工衛星の座標に加算する
-    this.satelliteDirection.normalize();
-    const direction = this.satelliteDirection.clone();
-    this.satellite.position.add(
-      direction.multiplyScalar(ThreeApp.SATELLITE_SPEED)
-    );
-
-    this.composer.render(); // シーンをレンダリング
+    this.composer.render();
   }
 }
