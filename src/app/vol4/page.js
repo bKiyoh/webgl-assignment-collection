@@ -113,6 +113,7 @@ class ThreeApp {
   axesHelper; // 軸ヘルパー
   isDown; // キーの押下状態用フラグ
   group; // グループ
+  groupList; // グループ
   raycaster; // レイキャスター @@@
   plane; // 板ポリゴン @@@
 
@@ -126,34 +127,39 @@ class ThreeApp {
     this.width = width;
     this.height = height;
     this.render = this.render.bind(this);
+    const rotateY = Math.PI;
 
     // Raycaster のインスタンスを生成する @@@
     this.raycaster = new THREE.Raycaster();
     // マウスのクリックイベントの定義 @@@
-    // window.addEventListener(
-    //   "click",
-    //   (mouseEvent) => {
-    //     // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
-    //     const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
-    //     const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
-    //     // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
-    //     const v = new THREE.Vector2(x, -y);
-    //     // レイキャスターに正規化済みマウス座標とカメラを指定する
-    //     this.raycaster.setFromCamera(v, this.camera);
-    //     // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
-    //     const intersects = this.raycaster.intersectObjects(this.plane);
-    //     // レイが交差しなかった場合を考慮し一度マテリアルを通常時の状態にリセットしておく
-    //     // this.torusArray.forEach((mesh) => {
-    //     //   mesh.material = this.material;
-    //     // });
-
-    //     if (intersects.length > 0) {
-    //       intersects[0].object.material = this.hitMaterial;
-    //     }
-    //   },
-    //   false
-    // );
-
+    window.addEventListener(
+      "click",
+      (mouseEvent) => {
+        // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
+        const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
+        const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
+        // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
+        const v = new THREE.Vector2(x, -y);
+        // レイキャスターに正規化済みマウス座標とカメラを指定する
+        this.raycaster.setFromCamera(v, this.camera);
+        // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
+        const intersects = this.raycaster.intersectObjects(
+          this.groupList.flatMap((group) => group.children)
+        );
+        console.log(intersects);
+        if (intersects.length > 0) {
+          const selectedObject = intersects[0].object;
+          // サブグループ内のオブジェクトを探して一致するものを取得
+          const selectedGroup = this.groupList.find((group) =>
+            group.children.includes(selectedObject)
+          );
+          if (selectedGroup) {
+            selectedGroup.rotation.y += 0.5;
+          }
+        }
+      },
+      false
+    );
     // キーの押下や離す操作を検出できるようにする
     window.addEventListener(
       "keydown",
@@ -256,8 +262,13 @@ class ThreeApp {
     const offsetY = ((gridHeight - 1) * spacingY) / 2;
 
     this.load().then(() => {
+      this.torusArray = [];
+      this.groupList = [];
+
       for (let i = 0; i < 7; i++) {
         for (let j = 0; j < 3; j++) {
+          const subGroup = new THREE.Group(); // 各グループを作成
+
           // 背景用板ポリゴン
           const planeGeometry1 = new THREE.BoxGeometry(11.15, 11.15, 0.3);
           const planeMaterial1 = new THREE.MeshBasicMaterial({
@@ -267,19 +278,47 @@ class ThreeApp {
           plane1.position.set(
             i * spacingX - offsetX,
             j * spacingY - offsetY,
-            -0.3
+            0
           );
-          this.scene.add(plane1);
+          subGroup.add(plane1);
 
-          const t = i * 3 + j; // インデックス計算
-          console.log(t);
-          // テクスチャ用板ポリゴン
+          const index = i * 3 + j; // インデックス計算
+
+          // テクスチャ用板ポリゴン（前面）
           const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
-          const planeMaterial = new THREE.MeshBasicMaterial();
-          planeMaterial.map = this.textureList[t];
+          const planeMaterial = new THREE.MeshBasicMaterial({
+            map: this.textureList[index],
+            side: THREE.FrontSide,
+          });
           const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-          plane.position.set(i * spacingX - offsetX, j * spacingY - offsetY, 0);
-          this.scene.add(plane);
+          plane.position.set(
+            i * spacingX - offsetX,
+            j * spacingY - offsetY,
+            0.5
+          );
+          subGroup.add(plane);
+
+          // テクスチャ用板ポリゴン（背面）
+          const planeMaterial2 = new THREE.MeshBasicMaterial({
+            map: this.textureList[index],
+            side: THREE.BackSide,
+          });
+          const plane2 = new THREE.Mesh(planeGeometry, planeMaterial2);
+          plane2.position.set(
+            i * spacingX - offsetX,
+            j * spacingY - offsetY,
+            -0.5
+          );
+          // plane2.rotateY(Math.PI);
+          subGroup.add(plane2);
+
+          // サブグループを配列に追加
+          this.groupList.push(subGroup);
+          // サブグループをシーンに追加
+          this.scene.add(subGroup);
+
+          const A = { plane: plane, plane1: plane1, plane2: plane2 };
+          this.torusArray.push(A);
         }
       }
     });
@@ -334,11 +373,6 @@ class ThreeApp {
 
     // コントロールを更新
     this.controls.update();
-
-    // フラグに応じてオブジェクトの状態を変化させる
-    if (this.isDown === true) {
-      this.group.rotation.y += 0.05;
-    }
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
