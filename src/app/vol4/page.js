@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
 import * as THREE from "@/lib/threeJs/three.module.js";
-import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
@@ -48,7 +47,7 @@ class ThreeApp {
     fovy: 60,
     near: 0.1,
     far: 100.0,
-    position: new THREE.Vector3(0.0, 0.0, 48.0),
+    position: new THREE.Vector3(0.0, 0.0, 32.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -83,7 +82,7 @@ class ThreeApp {
     color: 0xffffff,
   };
   /**
-   * レイが交差した際のマテリアル定義のための定数 @@@
+   * レイが交差した際のマテリアル定義のための定数
    */
   static INTERSECTION_MATERIAL_PARAM = {
     color: 0x00ff00,
@@ -106,7 +105,6 @@ class ThreeApp {
   planeArray; // トーラスメッシュの配列
   texture; // テクスチャ
   textureList; // テクスチャ
-  controls; // オービットコントロール
   groupList; // グループ
   rayCaster; // レイキャスター @@@
   plane; // 板ポリゴン @@@
@@ -147,7 +145,7 @@ class ThreeApp {
             group.children.includes(selectedObject)
           );
           if (selectedGroup) {
-            selectedGroup.rotation.y += 0.5;
+            this.animateRotation(selectedGroup);
           }
         }
       },
@@ -184,6 +182,36 @@ class ThreeApp {
       },
       false
     );
+  }
+
+  /**
+   * 指定されたオブジェクトを目標角度までアニメーションで回転させる関数
+   * @param {THREE.Group} object - 回転させる対象のオブジェクト
+   */
+  animateRotation(object) {
+    const duration = 500; // アニメーションの時間（ミリ秒）
+    // アニメーションの開始時間
+    // NOTE: https://developer.mozilla.org/ja/docs/Web/API/Performance/now
+    const startTime = performance.now();
+    const initialRotation = object.rotation.y; // 初期の回転角度
+
+    /**
+     * アニメーションフレームごとに呼び出される関数
+     * @param {number} currentTime - 現在の時間（ミリ秒）
+     */
+    const animate = (currentTime) => {
+      const elapsedTime = currentTime - startTime; // 経過時間
+      const progress = Math.min(elapsedTime / duration, 1); // アニメーションの進行度（0から1の範囲）
+      object.rotation.y = initialRotation + progress * Math.PI; // 現在の回転角度を設定
+
+      if (progress < 1) {
+        // アニメーションがまだ完了していない場合、次のフレームをリクエスト
+        requestAnimationFrame(animate);
+      }
+    };
+
+    // 最初のアニメーションフレームをリクエスト
+    requestAnimationFrame(animate);
   }
 
   /**
@@ -240,7 +268,7 @@ class ThreeApp {
     const spacingY = 12.0; // Y方向の間隔
 
     // グリッドのサイズを決定
-    const gridWidth = 7; // X方向のグリッドの数
+    const gridWidth = 5; // X方向のグリッドの数
     const gridHeight = 3; // Y方向のグリッドの数
 
     // グリッドの中心を原点にするためのオフセット
@@ -251,7 +279,7 @@ class ThreeApp {
       this.planeArray = [];
       this.groupList = [];
 
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 5; i++) {
         for (let j = 0; j < 3; j++) {
           const subGroup = new THREE.Group();
           // サブグループの位置を設定（位置の軸を設定）
@@ -314,9 +342,6 @@ class ThreeApp {
     this.axesHelper = new THREE.AxesHelper(axesBarLength);
     // this.scene.add(this.axesHelper);
 
-    // コントロール
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-
     // キーの押下状態を保持するフラグ
     this.isDown = false;
   }
@@ -356,9 +381,6 @@ class ThreeApp {
   render() {
     // 恒常ループ
     requestAnimationFrame(this.render);
-
-    // コントロールを更新
-    this.controls.update();
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
