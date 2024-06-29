@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
+
 import * as THREE from "@/lib/threeJs/three.module.js";
 
 export default function Page() {
@@ -108,6 +110,7 @@ class ThreeApp {
   groupList; // グループ
   rayCaster; // レイキャスター @@@
   plane; // 板ポリゴン @@@
+  controls; // オービットコントロール
 
   /**
    * コンストラクタ
@@ -290,12 +293,12 @@ class ThreeApp {
           );
 
           // 背景用板ポリゴン
-          const boxGeometry = new THREE.BoxGeometry(11.15, 11.15, 0.3);
+          const boxGeometry = new THREE.BoxGeometry(11.5, 11.5, 0.3);
           const boxMaterial = new THREE.MeshBasicMaterial({
             color: 0xf5f5f5,
           });
           const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-          subGroup.add(boxMesh);
+          // subGroup.add(boxMesh);
 
           const index = i * 3 + j; // インデックス計算
 
@@ -337,10 +340,8 @@ class ThreeApp {
       }
     });
 
-    // 軸ヘルパー
-    const axesBarLength = 5.0;
-    this.axesHelper = new THREE.AxesHelper(axesBarLength);
-    // this.scene.add(this.axesHelper);
+    // オービットコントロールの設定
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
     // キーの押下状態を保持するフラグ
     this.isDown = false;
@@ -353,8 +354,9 @@ class ThreeApp {
     this.textureList = [];
     const promises = [];
 
-    for (let i = 0; i < 21; i++) {
-      const imagePath = `/vol4/${i}.jpg`;
+    for (let i = 0; i < 15; i++) {
+      // const imagePath = `/vol4/light/${i}.jpg`;
+      const imagePath = `/vol4/flower/${i}.jpg`;
       const loader = new THREE.TextureLoader();
       const promise = new Promise((resolve, reject) => {
         loader.load(
@@ -381,6 +383,8 @@ class ThreeApp {
   render() {
     // 恒常ループ
     requestAnimationFrame(this.render);
+
+    this.controls.update();
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
