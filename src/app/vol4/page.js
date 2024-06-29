@@ -47,8 +47,8 @@ class ThreeApp {
   static CAMERA_PARAM = {
     fovy: 60,
     near: 0.1,
-    far: 50.0,
-    position: new THREE.Vector3(0.0, 2.0, 12.0),
+    far: 100.0,
+    position: new THREE.Vector3(0.0, 0.0, 48.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -65,7 +65,7 @@ class ThreeApp {
    * 平行光源定義のための定数
    */
   static DIRECTIONAL_LIGHT_PARAM = {
-    color: 0xffffff,
+    color: 0x0000ff,
     intensity: 1.0,
     position: new THREE.Vector3(1.0, 1.0, 1.0),
   };
@@ -73,7 +73,7 @@ class ThreeApp {
    * アンビエントライト定義のための定数
    */
   static AMBIENT_LIGHT_PARAM = {
-    color: 0xffffff,
+    color: 0x0000ff,
     intensity: 0.1,
   };
   /**
@@ -108,11 +108,13 @@ class ThreeApp {
   torusGeometry; // トーラスジオメトリ
   torusArray; // トーラスメッシュの配列
   texture; // テクスチャ
+  textureList; // テクスチャ
   controls; // オービットコントロール
   axesHelper; // 軸ヘルパー
   isDown; // キーの押下状態用フラグ
   group; // グループ
   raycaster; // レイキャスター @@@
+  plane; // 板ポリゴン @@@
 
   /**
    * コンストラクタ
@@ -128,29 +130,29 @@ class ThreeApp {
     // Raycaster のインスタンスを生成する @@@
     this.raycaster = new THREE.Raycaster();
     // マウスのクリックイベントの定義 @@@
-    window.addEventListener(
-      "click",
-      (mouseEvent) => {
-        // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
-        const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
-        const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
-        // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
-        const v = new THREE.Vector2(x, -y);
-        // レイキャスターに正規化済みマウス座標とカメラを指定する
-        this.raycaster.setFromCamera(v, this.camera);
-        // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
-        const intersects = this.raycaster.intersectObjects(this.torusArray);
-        // レイが交差しなかった場合を考慮し一度マテリアルを通常時の状態にリセットしておく
-        this.torusArray.forEach((mesh) => {
-          mesh.material = this.material;
-        });
+    // window.addEventListener(
+    //   "click",
+    //   (mouseEvent) => {
+    //     // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
+    //     const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
+    //     const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
+    //     // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
+    //     const v = new THREE.Vector2(x, -y);
+    //     // レイキャスターに正規化済みマウス座標とカメラを指定する
+    //     this.raycaster.setFromCamera(v, this.camera);
+    //     // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
+    //     const intersects = this.raycaster.intersectObjects(this.plane);
+    //     // レイが交差しなかった場合を考慮し一度マテリアルを通常時の状態にリセットしておく
+    //     // this.torusArray.forEach((mesh) => {
+    //     //   mesh.material = this.material;
+    //     // });
 
-        if (intersects.length > 0) {
-          intersects[0].object.material = this.hitMaterial;
-        }
-      },
-      false
-    );
+    //     if (intersects.length > 0) {
+    //       intersects[0].object.material = this.hitMaterial;
+    //     }
+    //   },
+    //   false
+    // );
 
     // キーの押下や離す操作を検出できるようにする
     window.addEventListener(
@@ -203,11 +205,11 @@ class ThreeApp {
     this.scene = new THREE.Scene();
 
     // フォグ
-    this.scene.fog = new THREE.Fog(
-      ThreeApp.FOG_PARAM.color,
-      ThreeApp.FOG_PARAM.near,
-      ThreeApp.FOG_PARAM.far
-    );
+    // this.scene.fog = new THREE.Fog(
+    //   ThreeApp.FOG_PARAM.color,
+    //   ThreeApp.FOG_PARAM.near,
+    //   ThreeApp.FOG_PARAM.far
+    // );
 
     // カメラ
     this.aspect = this.width / this.height;
@@ -228,46 +230,64 @@ class ThreeApp {
     this.directionalLight.position.copy(
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
     );
-    this.scene.add(this.directionalLight);
+    // this.scene.add(this.directionalLight);
 
     // アンビエントライト（環境光）
     this.ambientLight = new THREE.AmbientLight(
       ThreeApp.AMBIENT_LIGHT_PARAM.color,
       ThreeApp.AMBIENT_LIGHT_PARAM.intensity
     );
-    this.scene.add(this.ambientLight);
-
-    // マテリアル
-    this.material = new THREE.MeshPhongMaterial(ThreeApp.MATERIAL_PARAM);
-    this.material.map = this.texture;
-    // 交差時に表示するためのマテリアルを定義 @@@
-    this.hitMaterial = new THREE.MeshPhongMaterial(
-      ThreeApp.INTERSECTION_MATERIAL_PARAM
-    );
-    this.hitMaterial.map = this.texture;
+    // this.scene.add(this.ambientLight);
 
     // グループ
     this.group = new THREE.Group();
     this.scene.add(this.group);
 
-    // トーラスメッシュ
-    const torusCount = 10;
-    const transformScale = 5.0;
-    this.torusGeometry = new THREE.TorusGeometry(0.5, 0.2, 8, 16);
-    this.torusArray = [];
-    for (let i = 0; i < torusCount; ++i) {
-      const torus = new THREE.Mesh(this.torusGeometry, this.material);
-      torus.position.x = (Math.random() * 2.0 - 1.0) * transformScale;
-      torus.position.y = (Math.random() * 2.0 - 1.0) * transformScale;
-      torus.position.z = (Math.random() * 2.0 - 1.0) * transformScale;
-      this.group.add(torus);
-      this.torusArray.push(torus);
-    }
+    // 各ポリゴンの間隔
+    const spacingX = 12.0; // X方向の間隔
+    const spacingY = 12.0; // Y方向の間隔
+
+    // グリッドのサイズを決定
+    const gridWidth = 7; // X方向のグリッドの数
+    const gridHeight = 3; // Y方向のグリッドの数
+
+    // グリッドの中心を原点にするためのオフセット
+    const offsetX = ((gridWidth - 1) * spacingX) / 2;
+    const offsetY = ((gridHeight - 1) * spacingY) / 2;
+
+    this.load().then(() => {
+      for (let i = 0; i < 7; i++) {
+        for (let j = 0; j < 3; j++) {
+          // 背景用板ポリゴン
+          const planeGeometry1 = new THREE.BoxGeometry(11.15, 11.15, 0.3);
+          const planeMaterial1 = new THREE.MeshBasicMaterial({
+            color: 0xf5f5f5,
+          });
+          const plane1 = new THREE.Mesh(planeGeometry1, planeMaterial1);
+          plane1.position.set(
+            i * spacingX - offsetX,
+            j * spacingY - offsetY,
+            -0.3
+          );
+          this.scene.add(plane1);
+
+          const t = i * 3 + j; // インデックス計算
+          console.log(t);
+          // テクスチャ用板ポリゴン
+          const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
+          const planeMaterial = new THREE.MeshBasicMaterial();
+          planeMaterial.map = this.textureList[t];
+          const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+          plane.position.set(i * spacingX - offsetX, j * spacingY - offsetY, 0);
+          this.scene.add(plane);
+        }
+      }
+    });
 
     // 軸ヘルパー
     const axesBarLength = 5.0;
     this.axesHelper = new THREE.AxesHelper(axesBarLength);
-    this.scene.add(this.axesHelper);
+    // this.scene.add(this.axesHelper);
 
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -280,14 +300,29 @@ class ThreeApp {
    * アセット（素材）のロードを行う Promise
    */
   load() {
-    return new Promise((resolve) => {
-      const imagePath = "./sphere.jpg";
+    this.textureList = [];
+    const promises = [];
+
+    for (let i = 0; i < 21; i++) {
+      const imagePath = `/vol4/${i}.jpg`;
       const loader = new THREE.TextureLoader();
-      loader.load(imagePath, (texture) => {
-        this.texture = texture;
-        resolve();
+      const promise = new Promise((resolve, reject) => {
+        loader.load(
+          imagePath,
+          (texture) => {
+            this.textureList[i] = texture;
+            resolve();
+          },
+          undefined,
+          (err) => {
+            reject(err);
+          }
+        );
       });
-    });
+      promises.push(promise);
+    }
+
+    return Promise.all(promises);
   }
 
   /**
