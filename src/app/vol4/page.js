@@ -103,18 +103,12 @@ class ThreeApp {
   camera; // カメラ
   directionalLight; // 平行光源（ディレクショナルライト）
   ambientLight; // 環境光（アンビエントライト）
-  material; // マテリアル
-  hitMaterial; // レイが交差した際のマテリアル @@@
-  torusGeometry; // トーラスジオメトリ
-  torusArray; // トーラスメッシュの配列
+  planeArray; // トーラスメッシュの配列
   texture; // テクスチャ
   textureList; // テクスチャ
   controls; // オービットコントロール
-  axesHelper; // 軸ヘルパー
-  isDown; // キーの押下状態用フラグ
-  group; // グループ
   groupList; // グループ
-  raycaster; // レイキャスター @@@
+  rayCaster; // レイキャスター @@@
   plane; // 板ポリゴン @@@
 
   /**
@@ -127,11 +121,11 @@ class ThreeApp {
     this.width = width;
     this.height = height;
     this.render = this.render.bind(this);
-    const rotateY = Math.PI;
 
-    // Raycaster のインスタンスを生成する @@@
-    this.raycaster = new THREE.Raycaster();
-    // マウスのクリックイベントの定義 @@@
+    // Raycaster のインスタンスを生成
+    this.rayCaster = new THREE.Raycaster();
+
+    // マウスのクリックイベントの定義
     window.addEventListener(
       "click",
       (mouseEvent) => {
@@ -141,12 +135,11 @@ class ThreeApp {
         // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
         const v = new THREE.Vector2(x, -y);
         // レイキャスターに正規化済みマウス座標とカメラを指定する
-        this.raycaster.setFromCamera(v, this.camera);
+        this.rayCaster.setFromCamera(v, this.camera);
         // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
-        const intersects = this.raycaster.intersectObjects(
+        const intersects = this.rayCaster.intersectObjects(
           this.groupList.flatMap((group) => group.children)
         );
-        console.log(intersects);
         if (intersects.length > 0) {
           const selectedObject = intersects[0].object;
           // サブグループ内のオブジェクトを探して一致するものを取得
@@ -210,13 +203,6 @@ class ThreeApp {
     // シーン
     this.scene = new THREE.Scene();
 
-    // フォグ
-    // this.scene.fog = new THREE.Fog(
-    //   ThreeApp.FOG_PARAM.color,
-    //   ThreeApp.FOG_PARAM.near,
-    //   ThreeApp.FOG_PARAM.far
-    // );
-
     // カメラ
     this.aspect = this.width / this.height;
     this.camera = new THREE.PerspectiveCamera(
@@ -262,63 +248,63 @@ class ThreeApp {
     const offsetY = ((gridHeight - 1) * spacingY) / 2;
 
     this.load().then(() => {
-      this.torusArray = [];
+      this.planeArray = [];
       this.groupList = [];
 
       for (let i = 0; i < 7; i++) {
         for (let j = 0; j < 3; j++) {
-          const subGroup = new THREE.Group(); // 各グループを作成
-
-          // 背景用板ポリゴン
-          const planeGeometry1 = new THREE.BoxGeometry(11.15, 11.15, 0.3);
-          const planeMaterial1 = new THREE.MeshBasicMaterial({
-            color: 0xf5f5f5,
-          });
-          const plane1 = new THREE.Mesh(planeGeometry1, planeMaterial1);
-          plane1.position.set(
+          const subGroup = new THREE.Group();
+          // サブグループの位置を設定（位置の軸を設定）
+          subGroup.position.set(
             i * spacingX - offsetX,
             j * spacingY - offsetY,
             0
           );
-          subGroup.add(plane1);
+
+          // 背景用板ポリゴン
+          const boxGeometry = new THREE.BoxGeometry(11.15, 11.15, 0.3);
+          const boxMaterial = new THREE.MeshBasicMaterial({
+            color: 0xf5f5f5,
+          });
+          const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
+          subGroup.add(boxMesh);
 
           const index = i * 3 + j; // インデックス計算
 
           // テクスチャ用板ポリゴン（前面）
           const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
-          const planeMaterial = new THREE.MeshBasicMaterial({
+          const frontPlaneMaterial = new THREE.MeshBasicMaterial({
             map: this.textureList[index],
             side: THREE.FrontSide,
           });
-          const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-          plane.position.set(
-            i * spacingX - offsetX,
-            j * spacingY - offsetY,
-            0.5
+          const frontPlaneMesh = new THREE.Mesh(
+            planeGeometry,
+            frontPlaneMaterial
           );
-          subGroup.add(plane);
+          frontPlaneMesh.position.z = 0.5;
+          subGroup.add(frontPlaneMesh);
 
           // テクスチャ用板ポリゴン（背面）
-          const planeMaterial2 = new THREE.MeshBasicMaterial({
+          const backPlaneMaterial = new THREE.MeshBasicMaterial({
             map: this.textureList[index],
             side: THREE.BackSide,
           });
-          const plane2 = new THREE.Mesh(planeGeometry, planeMaterial2);
-          plane2.position.set(
-            i * spacingX - offsetX,
-            j * spacingY - offsetY,
-            -0.5
+          const backPlaneMesh = new THREE.Mesh(
+            planeGeometry,
+            backPlaneMaterial
           );
-          // plane2.rotateY(Math.PI);
-          subGroup.add(plane2);
+          backPlaneMesh.position.z = -0.5;
+          subGroup.add(backPlaneMesh);
 
-          // サブグループを配列に追加
           this.groupList.push(subGroup);
-          // サブグループをシーンに追加
           this.scene.add(subGroup);
 
-          const A = { plane: plane, plane1: plane1, plane2: plane2 };
-          this.torusArray.push(A);
+          const planes = {
+            frontPlane: frontPlaneMesh,
+            plane1: boxMesh,
+            backPlane: backPlaneMesh,
+          };
+          this.planeArray.push(planes);
         }
       }
     });
