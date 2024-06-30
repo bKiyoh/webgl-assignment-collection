@@ -6,10 +6,10 @@ export default function Page() {
   const initializedRef = useRef(false);
 
   // ThreeAppの初期化とロードを行う関数
-  const initAndLoad = async (app) => {
-    await app.load();
-    app.init();
-    app.render();
+  const initializeAndLoadApp = async (app) => {
+    await app.loadAssets();
+    app.initialize();
+    app.renderLoop();
   };
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function Page() {
     const wrapper = document.querySelector("#webgl");
     if (wrapper && !initializedRef.current) {
       const app = new ThreeApp(wrapper, width, height);
-      initAndLoad(app);
+      initializeAndLoadApp(app);
       initializedRef.current = true;
     }
 
@@ -43,7 +43,7 @@ class ThreeApp {
    * @param {THREE.Vector3} position - カメラの座標
    * @param {THREE.Vector3} lookAt - カメラの注視点
    */
-  static CAMERA_PARAM = {
+  static CAMERA_PARAMETERS = {
     fovy: 60,
     near: 0.1,
     far: 100.0,
@@ -56,33 +56,34 @@ class ThreeApp {
    * @param {number} clearColor - 画面をクリアする色
    * @param {number} rendererRatio - レンダラーの比率
    */
-  static RENDERER_PARAM = {
+  static RENDERER_PARAMETERS = {
     clearColor: 0xffffff,
     rendererRatio: 120,
   };
 
-  wrapper; // canvas の親要素
+  wrapperElement; // canvas の親要素
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
-  planeArray; // トーラスメッシュの配列
-  texture; // テクスチャ
-  frontSideTextureList; // テクスチャ
-  backSideTextureList; // テクスチャ
-  groupList; // グループ
+  planeMeshArray; // トーラスメッシュの配列
+  frontTextures; // 前面テクスチャリスト
+  backTextures; // 背面テクスチャリスト
+  objectGroups; // グループリスト
   rayCaster; // レイキャスター
-  isAnimating;
+  isAnimating; // アニメーション中かどうか
 
   /**
    * コンストラクタ
    * @constructor
    * @param {HTMLElement} wrapper - canvas 要素を append する親要素
+   * @param {number} width - 画面の幅
+   * @param {number} height - 画面の高さ
    */
   constructor(wrapper, width, height) {
-    this.wrapper = wrapper;
+    this.wrapperElement = wrapper;
     this.width = width;
     this.height = height;
-    this.render = this.render.bind(this);
+    this.renderLoop = this.render.bind(this);
 
     // Raycaster のインスタンスを生成
     this.rayCaster = new THREE.Raycaster();
@@ -96,21 +97,21 @@ class ThreeApp {
         const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
         const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
         // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
-        const v = new THREE.Vector2(x, -y);
+        const normalizedMouse = new THREE.Vector2(x, -y);
         // レイキャスターに正規化済みマウス座標とカメラを指定する
-        this.rayCaster.setFromCamera(v, this.camera);
+        this.rayCaster.setFromCamera(normalizedMouse, this.camera);
         // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
         const intersects = this.rayCaster.intersectObjects(
-          this.groupList.flatMap((group) => group.children)
+          this.objectGroups.flatMap((group) => group.children)
         );
         if (intersects.length > 0) {
           const selectedObject = intersects[0].object;
           // サブグループ内のオブジェクトを探して一致するものを取得
-          const selectedGroup = this.groupList.find((group) =>
+          const selectedGroup = this.objectGroups.find((group) =>
             group.children.includes(selectedObject)
           );
           if (selectedGroup) {
-            this.animateRotation(selectedGroup);
+            this.animateGroupRotation(selectedGroup);
           }
         }
       },
@@ -123,7 +124,7 @@ class ThreeApp {
         if (this.isAnimating) return;
         switch (keyEvent.key) {
           case " ":
-            this.animateRotation(this.groupList);
+            this.animateGroupRotation(this.objectGroups);
             break;
           default:
         }
@@ -147,7 +148,7 @@ class ThreeApp {
    * 指定されたオブジェクトを目標角度までアニメーションで回転させる関数
    * @param {THREE.Group|THREE.Group[]} objects - 回転させる対象のオブジェクトまたはオブジェクトの配列
    */
-  animateRotation(objects) {
+  animateGroupRotation(objects) {
     if (this.isAnimating) return;
     this.isAnimating = true;
 
@@ -165,7 +166,7 @@ class ThreeApp {
         const duration = 50; // アニメーションの時間（ミリ秒）
         // アニメーションの開始時間
         // NOTE: Performance: now() メソッド https://developer.mozilla.org/ja/docs/Web/API/Performance/now
-        const startTime = performance.now();
+        const startTime = performance.now(); // アニメーションの開始時間
 
         // アニメーションフレームごとに呼び出される関数
         const animate = (currentTime) => {
@@ -204,34 +205,34 @@ class ThreeApp {
   /**
    * 初期化処理
    */
-  init() {
+  initialize() {
     // レンダラー
-    const color = new THREE.Color(ThreeApp.RENDERER_PARAM.clearColor);
+    const clearColor = new THREE.Color(ThreeApp.RENDERER_PARAMETERS.clearColor);
     this.renderer = new THREE.WebGLRenderer();
-    this.renderer.setClearColor(color);
+    this.renderer.setClearColor(clearColor);
     this.renderer.setSize(
-      this.width - ThreeApp.RENDERER_PARAM.rendererRatio,
-      this.height - ThreeApp.RENDERER_PARAM.rendererRatio
+      this.width - ThreeApp.RENDERER_PARAMETERS.rendererRatio,
+      this.height - ThreeApp.RENDERER_PARAMETERS.rendererRatio
     );
-    this.wrapper.appendChild(this.renderer.domElement);
+    this.wrapperElement.appendChild(this.renderer.domElement);
 
     // シーン
     this.scene = new THREE.Scene();
 
     // カメラ
-    this.aspect = this.width / this.height;
+    this.aspectRatio = this.width / this.height;
     this.camera = new THREE.PerspectiveCamera(
-      ThreeApp.CAMERA_PARAM.fovy,
-      this.aspect,
-      ThreeApp.CAMERA_PARAM.near,
-      ThreeApp.CAMERA_PARAM.far
+      ThreeApp.CAMERA_PARAMETERS.fovy,
+      this.aspectRatio,
+      ThreeApp.CAMERA_PARAMETERS.near,
+      ThreeApp.CAMERA_PARAMETERS.far
     );
-    this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
-    this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
+    this.camera.position.copy(ThreeApp.CAMERA_PARAMETERS.position);
+    this.camera.lookAt(ThreeApp.CAMERA_PARAMETERS.lookAt);
 
     // グループ
-    this.group = new THREE.Group();
-    this.scene.add(this.group);
+    this.objectGroup = new THREE.Group();
+    this.scene.add(this.objectGroup);
 
     // 各ポリゴンの間隔
     const spacingX = 12.0; // X方向の間隔
@@ -245,12 +246,12 @@ class ThreeApp {
     const offsetX = ((gridWidth - 1) * spacingX) / 2;
     const offsetY = ((gridHeight - 1) * spacingY) / 2;
 
-    this.load().then(() => {
-      this.planeArray = [];
-      this.groupList = [];
+    this.loadAssets().then(() => {
+      this.planeMeshArray = [];
+      this.objectGroups = [];
 
-      for (let i = 0; i < 5; i++) {
-        for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < gridWidth; i++) {
+        for (let j = 0; j < gridHeight; j++) {
           const subGroup = new THREE.Group();
           // サブグループの位置を設定（位置の軸を設定）
           subGroup.position.set(
@@ -259,12 +260,12 @@ class ThreeApp {
             0
           );
 
-          const index = i * 3 + j; // インデックス計算
+          const index = i * gridHeight + j; // インデックス計算
 
           // テクスチャ用板ポリゴン（前面）
           const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
           const frontPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.frontSideTextureList[index],
+            map: this.frontTextures[index],
             side: THREE.FrontSide,
           });
           const frontPlaneMesh = new THREE.Mesh(
@@ -276,7 +277,7 @@ class ThreeApp {
 
           // テクスチャ用板ポリゴン（背面）
           const backPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.backSideTextureList[index],
+            map: this.backTextures[index],
             side: THREE.BackSide,
           });
           const backPlaneMesh = new THREE.Mesh(
@@ -286,14 +287,14 @@ class ThreeApp {
           backPlaneMesh.position.z = -0.25;
           subGroup.add(backPlaneMesh);
 
-          this.groupList.push(subGroup);
+          this.objectGroups.push(subGroup);
           this.scene.add(subGroup);
 
           const planes = {
             frontPlane: frontPlaneMesh,
             backPlane: backPlaneMesh,
           };
-          this.planeArray.push(planes);
+          this.planeMeshArray.push(planes);
         }
       }
     });
@@ -303,20 +304,20 @@ class ThreeApp {
   /**
    * アセット（素材）のロードを行う Promise
    */
-  load() {
-    this.frontSideTextureList = [];
-    this.backSideTextureList = [];
+  loadAssets() {
+    this.frontTextures = [];
+    this.backTextures = [];
     const promises = [];
 
     for (let i = 0; i < 15; i++) {
-      const frontSideImagePath = `/vol4/light/${i}.jpg`;
-      const backSideImagePath = `/vol4/flower/${i}.jpg`;
-      const loader = new THREE.TextureLoader();
-      const frontPromise = new Promise((resolve, reject) => {
-        loader.load(
-          frontSideImagePath,
+      const frontTexturePath = `/vol4/light/${i}.jpg`;
+      const backTexturePath = `/vol4/flower/${i}.jpg`;
+      const textureLoader = new THREE.TextureLoader();
+      const frontTexturePromise = new Promise((resolve, reject) => {
+        textureLoader.load(
+          frontTexturePath,
           (texture) => {
-            this.frontSideTextureList[i] = texture;
+            this.frontTextures[i] = texture;
             resolve();
           },
           undefined,
@@ -325,14 +326,14 @@ class ThreeApp {
           }
         );
       });
-      const backPromise = new Promise((resolve, reject) => {
-        loader.load(
-          backSideImagePath,
+      const backTexturePromise = new Promise((resolve, reject) => {
+        textureLoader.load(
+          backTexturePath,
           (texture) => {
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(-1, 1);
-            this.backSideTextureList[i] = texture;
+            this.backTextures[i] = texture;
             resolve();
           },
           undefined,
@@ -341,8 +342,8 @@ class ThreeApp {
           }
         );
       });
-      promises.push(frontPromise);
-      promises.push(backPromise);
+      promises.push(frontTexturePromise);
+      promises.push(backTexturePromise);
     }
     return Promise.all(promises);
   }
