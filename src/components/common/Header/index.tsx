@@ -17,7 +17,7 @@ export function Header(props: PageProps) {
   return (
     <div className="ps-3">
       WebGL&nbsp;Assignment&nbsp;Collection&nbsp;-&nbsp;
-      {!isAction && <span className="font-bold">{pageName}</span>}
+      <span className="font-bold">{pageName}&nbsp;</span>
       {isAction && <span className="text-lg">Press&nbsp;Shift&nbsp;Key</span>}
     </div>
   );
