@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 
 import * as THREE from "@/lib/threeJs/three.module.js";
+import { resolve } from "path";
 
 export default function Page() {
   const initializedRef = useRef(false);
@@ -49,7 +50,7 @@ class ThreeApp {
     fovy: 60,
     near: 0.1,
     far: 100.0,
-    position: new THREE.Vector3(0.0, 0.0, 32.0),
+    position: new THREE.Vector3(0.0, 0.0, 34.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -106,11 +107,14 @@ class ThreeApp {
   ambientLight; // 環境光（アンビエントライト）
   planeArray; // トーラスメッシュの配列
   texture; // テクスチャ
-  textureList; // テクスチャ
+  frontSideTextureList; // テクスチャ
+  backSideTextureList; // テクスチャ
   groupList; // グループ
   rayCaster; // レイキャスター @@@
   plane; // 板ポリゴン @@@
   controls; // オービットコントロール
+  isDown;
+  isAnimating;
 
   /**
    * コンストラクタ
@@ -130,6 +134,7 @@ class ThreeApp {
     window.addEventListener(
       "click",
       (mouseEvent) => {
+        if (this.isAnimating) return;
         // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
         const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
         const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
@@ -158,9 +163,11 @@ class ThreeApp {
     window.addEventListener(
       "keydown",
       (keyEvent) => {
+        if (this.isAnimating) return;
         switch (keyEvent.key) {
           case " ":
             this.isDown = true;
+            this.animateRotation(this.groupList);
             break;
           default:
         }
@@ -191,30 +198,39 @@ class ThreeApp {
    * 指定されたオブジェクトを目標角度までアニメーションで回転させる関数
    * @param {THREE.Group} object - 回転させる対象のオブジェクト
    */
-  animateRotation(object) {
-    const duration = 500; // アニメーションの時間（ミリ秒）
-    // アニメーションの開始時間
-    // NOTE: https://developer.mozilla.org/ja/docs/Web/API/Performance/now
+  animateRotation(objects) {
+    if (this.isAnimating) return;
+    this.isAnimating = true;
+
+    const duration = 500;
     const startTime = performance.now();
-    const initialRotation = object.rotation.y; // 初期の回転角度
 
-    /**
-     * アニメーションフレームごとに呼び出される関数
-     * @param {number} currentTime - 現在の時間（ミリ秒）
-     */
-    const animate = (currentTime) => {
-      const elapsedTime = currentTime - startTime; // 経過時間
-      const progress = Math.min(elapsedTime / duration, 1); // アニメーションの進行度（0から1の範囲）
-      object.rotation.y = initialRotation + progress * Math.PI; // 現在の回転角度を設定
+    // 配列でない場合は単一のオブジェクトを配列に変換
+    if (!Array.isArray(objects)) {
+      objects = [objects];
+    }
 
-      if (progress < 1) {
-        // アニメーションがまだ完了していない場合、次のフレームをリクエスト
-        requestAnimationFrame(animate);
-      }
-    };
+    const initialRotations = objects.map((object) => object.rotation.y);
 
-    // 最初のアニメーションフレームをリクエスト
-    requestAnimationFrame(animate);
+    return new Promise((resolve) => {
+      const animate = (currentTime) => {
+        const elapsedTime = currentTime - startTime;
+        const progress = Math.min(elapsedTime / duration, 1);
+
+        for (let i = 0; i < objects.length; i++) {
+          objects[i].rotation.y = initialRotations[i] + progress * Math.PI;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          this.isAnimating = false;
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(animate);
+    });
   }
 
   /**
@@ -244,23 +260,6 @@ class ThreeApp {
     );
     this.camera.position.copy(ThreeApp.CAMERA_PARAM.position);
     this.camera.lookAt(ThreeApp.CAMERA_PARAM.lookAt);
-
-    // ディレクショナルライト（平行光源）
-    this.directionalLight = new THREE.DirectionalLight(
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.color,
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.intensity
-    );
-    this.directionalLight.position.copy(
-      ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
-    );
-    // this.scene.add(this.directionalLight);
-
-    // アンビエントライト（環境光）
-    this.ambientLight = new THREE.AmbientLight(
-      ThreeApp.AMBIENT_LIGHT_PARAM.color,
-      ThreeApp.AMBIENT_LIGHT_PARAM.intensity
-    );
-    // this.scene.add(this.ambientLight);
 
     // グループ
     this.group = new THREE.Group();
@@ -293,19 +292,19 @@ class ThreeApp {
           );
 
           // 背景用板ポリゴン
-          const boxGeometry = new THREE.BoxGeometry(11.5, 11.5, 0.3);
+          const boxGeometry = new THREE.BoxGeometry(11.1, 11.1, 0.3);
           const boxMaterial = new THREE.MeshBasicMaterial({
             color: 0xf5f5f5,
           });
           const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-          // subGroup.add(boxMesh);
+          subGroup.add(boxMesh);
 
           const index = i * 3 + j; // インデックス計算
 
           // テクスチャ用板ポリゴン（前面）
           const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
           const frontPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.textureList[index],
+            map: this.frontSideTextureList[index],
             side: THREE.FrontSide,
           });
           const frontPlaneMesh = new THREE.Mesh(
@@ -317,7 +316,7 @@ class ThreeApp {
 
           // テクスチャ用板ポリゴン（背面）
           const backPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.textureList[index],
+            map: this.backSideTextureList[index],
             side: THREE.BackSide,
           });
           const backPlaneMesh = new THREE.Mesh(
@@ -345,24 +344,26 @@ class ThreeApp {
 
     // キーの押下状態を保持するフラグ
     this.isDown = false;
+    this.isAnimating = false;
   }
 
   /**
    * アセット（素材）のロードを行う Promise
    */
   load() {
-    this.textureList = [];
+    this.frontSideTextureList = [];
+    this.backSideTextureList = [];
     const promises = [];
 
     for (let i = 0; i < 15; i++) {
-      // const imagePath = `/vol4/light/${i}.jpg`;
-      const imagePath = `/vol4/flower/${i}.jpg`;
+      const frontSideImagePath = `/vol4/light/${i}.jpg`;
+      const backSideImagePath = `/vol4/flower/${i}.jpg`;
       const loader = new THREE.TextureLoader();
-      const promise = new Promise((resolve, reject) => {
+      const frontPromise = new Promise((resolve, reject) => {
         loader.load(
-          imagePath,
+          frontSideImagePath,
           (texture) => {
-            this.textureList[i] = texture;
+            this.frontSideTextureList[i] = texture;
             resolve();
           },
           undefined,
@@ -371,9 +372,25 @@ class ThreeApp {
           }
         );
       });
-      promises.push(promise);
+      const backPromise = new Promise((resolve, reject) => {
+        loader.load(
+          backSideImagePath,
+          (texture) => {
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(-1, 1);
+            this.backSideTextureList[i] = texture;
+            resolve();
+          },
+          undefined,
+          (err) => {
+            reject(err);
+          }
+        );
+      });
+      promises.push(frontPromise);
+      promises.push(backPromise);
     }
-
     return Promise.all(promises);
   }
 
