@@ -1,9 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
-
 import * as THREE from "@/lib/threeJs/three.module.js";
-import { resolve } from "path";
 
 export default function Page() {
   const initializedRef = useRef(false);
@@ -50,7 +47,7 @@ class ThreeApp {
     fovy: 60,
     near: 0.1,
     far: 100.0,
-    position: new THREE.Vector3(0.0, 0.0, 34.0),
+    position: new THREE.Vector3(0.0, 0.0, 32.0),
     lookAt: new THREE.Vector3(0.0, 0.0, 0.0),
   };
   /**
@@ -63,57 +60,17 @@ class ThreeApp {
     clearColor: 0xffffff,
     rendererRatio: 120,
   };
-  /**
-   * 平行光源定義のための定数
-   */
-  static DIRECTIONAL_LIGHT_PARAM = {
-    color: 0x0000ff,
-    intensity: 1.0,
-    position: new THREE.Vector3(1.0, 1.0, 1.0),
-  };
-  /**
-   * アンビエントライト定義のための定数
-   */
-  static AMBIENT_LIGHT_PARAM = {
-    color: 0x0000ff,
-    intensity: 0.1,
-  };
-  /**
-   * マテリアル定義のための定数
-   */
-  static MATERIAL_PARAM = {
-    color: 0xffffff,
-  };
-  /**
-   * レイが交差した際のマテリアル定義のための定数
-   */
-  static INTERSECTION_MATERIAL_PARAM = {
-    color: 0x00ff00,
-  };
-  /**
-   * フォグの定義のための定数
-   */
-  static FOG_PARAM = {
-    color: 0xffffff,
-    near: 15.0,
-    far: 25.0,
-  };
 
   wrapper; // canvas の親要素
   renderer; // レンダラ
   scene; // シーン
   camera; // カメラ
-  directionalLight; // 平行光源（ディレクショナルライト）
-  ambientLight; // 環境光（アンビエントライト）
   planeArray; // トーラスメッシュの配列
   texture; // テクスチャ
   frontSideTextureList; // テクスチャ
   backSideTextureList; // テクスチャ
   groupList; // グループ
-  rayCaster; // レイキャスター @@@
-  plane; // 板ポリゴン @@@
-  controls; // オービットコントロール
-  isDown;
+  rayCaster; // レイキャスター
   isAnimating;
 
   /**
@@ -166,18 +123,10 @@ class ThreeApp {
         if (this.isAnimating) return;
         switch (keyEvent.key) {
           case " ":
-            this.isDown = true;
             this.animateRotation(this.groupList);
             break;
           default:
         }
-      },
-      false
-    );
-    window.addEventListener(
-      "keyup",
-      (keyEvent) => {
-        this.isDown = false;
       },
       false
     );
@@ -196,41 +145,60 @@ class ThreeApp {
 
   /**
    * 指定されたオブジェクトを目標角度までアニメーションで回転させる関数
-   * @param {THREE.Group} object - 回転させる対象のオブジェクト
+   * @param {THREE.Group|THREE.Group[]} objects - 回転させる対象のオブジェクトまたはオブジェクトの配列
    */
   animateRotation(objects) {
     if (this.isAnimating) return;
     this.isAnimating = true;
 
-    const duration = 500;
-    const startTime = performance.now();
-
-    // 配列でない場合は単一のオブジェクトを配列に変換
+    // 引数が配列でない場合は単一のオブジェクトを配列に変換
     if (!Array.isArray(objects)) {
       objects = [objects];
     }
 
+    // オブジェクトの初期回転角度を取得し配列に保存
     const initialRotations = objects.map((object) => object.rotation.y);
 
-    return new Promise((resolve) => {
-      const animate = (currentTime) => {
-        const elapsedTime = currentTime - startTime;
-        const progress = Math.min(elapsedTime / duration, 1);
+    // 単一のオブジェクトを回転させるPromiseを返す関数
+    const rotateObject = (object, initialRotation) => {
+      return new Promise((resolve) => {
+        const duration = 50; // アニメーションの時間（ミリ秒）
+        // アニメーションの開始時間
+        // NOTE: Performance: now() メソッド https://developer.mozilla.org/ja/docs/Web/API/Performance/now
+        const startTime = performance.now();
 
-        for (let i = 0; i < objects.length; i++) {
-          objects[i].rotation.y = initialRotations[i] + progress * Math.PI;
-        }
+        // アニメーションフレームごとに呼び出される関数
+        const animate = (currentTime) => {
+          const elapsedTime = currentTime - startTime; // 経過時間
+          const progress = Math.min(elapsedTime / duration, 1); // アニメーションの進行度（0から1の範囲）
+          object.rotation.y = initialRotation + progress * Math.PI; // 現在の回転角度を設定
 
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          this.isAnimating = false;
-          resolve();
-        }
-      };
+          // アニメーションがまだ完了していない場合、次のフレームをリクエスト
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            // アニメーションが完了した場合、Promiseを解決
+            resolve();
+          }
+        };
 
-      requestAnimationFrame(animate);
-    });
+        // 最初のアニメーションフレームをリクエスト
+        requestAnimationFrame(animate);
+      });
+    };
+
+    // 各オブジェクトを順番に回転させる非同期関数
+    const animateSequentially = async () => {
+      // NOTE: Object.entries() https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/Object/entries
+      // NOTE: for...inとfor...ofの違い  https://qiita.com/a05kk/items/d6f49ca5bd15f045ea6c
+      for (const [index, object] of objects.entries()) {
+        // 前のオブジェクトの回転が完了するまで待つ
+        await rotateObject(object, initialRotations[index]);
+      }
+      this.isAnimating = false;
+    };
+
+    animateSequentially();
   }
 
   /**
@@ -291,14 +259,6 @@ class ThreeApp {
             0
           );
 
-          // 背景用板ポリゴン
-          const boxGeometry = new THREE.BoxGeometry(11.1, 11.1, 0.3);
-          const boxMaterial = new THREE.MeshBasicMaterial({
-            color: 0xf5f5f5,
-          });
-          const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-          subGroup.add(boxMesh);
-
           const index = i * 3 + j; // インデックス計算
 
           // テクスチャ用板ポリゴン（前面）
@@ -311,7 +271,7 @@ class ThreeApp {
             planeGeometry,
             frontPlaneMaterial
           );
-          frontPlaneMesh.position.z = 0.5;
+          frontPlaneMesh.position.z = 0.25;
           subGroup.add(frontPlaneMesh);
 
           // テクスチャ用板ポリゴン（背面）
@@ -323,7 +283,7 @@ class ThreeApp {
             planeGeometry,
             backPlaneMaterial
           );
-          backPlaneMesh.position.z = -0.5;
+          backPlaneMesh.position.z = -0.25;
           subGroup.add(backPlaneMesh);
 
           this.groupList.push(subGroup);
@@ -331,19 +291,12 @@ class ThreeApp {
 
           const planes = {
             frontPlane: frontPlaneMesh,
-            plane1: boxMesh,
             backPlane: backPlaneMesh,
           };
           this.planeArray.push(planes);
         }
       }
     });
-
-    // オービットコントロールの設定
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-
-    // キーの押下状態を保持するフラグ
-    this.isDown = false;
     this.isAnimating = false;
   }
 
@@ -400,8 +353,6 @@ class ThreeApp {
   render() {
     // 恒常ループ
     requestAnimationFrame(this.render);
-
-    this.controls.update();
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
