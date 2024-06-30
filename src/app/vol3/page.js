@@ -187,7 +187,7 @@ class ThreeApp {
    */
   load() {
     return new Promise((resolve) => {
-      const spherePath = "/sphere.jpg";
+      const spherePath = "/vol3/sphere.jpg";
       const loader = new THREE.TextureLoader();
       loader.load(spherePath, (sphereTexture) => {
         this.sphereTexture = sphereTexture; // 球体テクスチャをロード
