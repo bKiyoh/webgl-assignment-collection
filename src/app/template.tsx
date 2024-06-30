@@ -57,7 +57,10 @@ export default function Template({ children }: { children: React.ReactNode }) {
             <Progress value={progress} />
           </div>
         </div>
-        <div style={{ display: progress >= 100 ? "block" : "none" }}>
+        <div
+          className="w-full flex justify-center"
+          style={{ display: progress >= 100 ? "flex" : "none" }}
+        >
           {children}
         </div>
         <div className="flex justify-end">
