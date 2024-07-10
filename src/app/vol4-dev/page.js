@@ -125,7 +125,6 @@ class ThreeApp {
     window.addEventListener(
       "resize",
       () => {
-        console.log("test");
         this.renderer.setSize(
           this.width - ThreeApp.RENDERER_PARAM.rendererRatio,
           this.height - ThreeApp.RENDERER_PARAM.rendererRatio
@@ -151,12 +150,15 @@ class ThreeApp {
     );
     this.wrapper.appendChild(this.renderer.domElement);
 
+    // レンダラーで影を描画するための機能を有効化する @@@
+    this.renderer.shadowMap.enabled = true;
+
+    // レンダラーに対しては影の描画アルゴリズムを指定できる @@@
+    // ※ちなみに既定値は THREE.PCFShadowMap なので、以下は省略可
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+
     // シーンの設定
     this.scene = new THREE.Scene();
-
-    // オフスクリーン用のシーン @@@
-    // 以下、各種オブジェクトやライトはオフスクリーン用のシーンに add しておく
-    this.offscreenScene = new THREE.Scene();
 
     // カメラの設定
     this.aspect = this.width / this.height;
@@ -177,54 +179,68 @@ class ThreeApp {
     this.directionalLight.position.copy(
       ThreeApp.DIRECTIONAL_LIGHT_PARAM.position
     );
-    this.offscreenScene.add(this.directionalLight);
+    this.scene.add(this.directionalLight);
+
+    // ディレクショナルライトが影を落とすように設定する @@@
+    this.directionalLight.castShadow = true;
+
+    // 影用のカメラ（平行投影のカメラ）は必要に応じて範囲を広げる @@@
+    this.directionalLight.shadow.camera.top = ThreeApp.SHADOW_PARAM.spaceSize;
+    this.directionalLight.shadow.camera.bottom =
+      -ThreeApp.SHADOW_PARAM.spaceSize;
+    this.directionalLight.shadow.camera.left = -ThreeApp.SHADOW_PARAM.spaceSize;
+    this.directionalLight.shadow.camera.right = ThreeApp.SHADOW_PARAM.spaceSize;
+
+    // 影用のバッファのサイズは変更することもできる @@@
+    this.directionalLight.shadow.mapSize.width = ThreeApp.SHADOW_PARAM.mapSize;
+    this.directionalLight.shadow.mapSize.height = ThreeApp.SHADOW_PARAM.mapSize;
+
+    // ライトの設定を可視化するためにヘルパーを使う @@@
+    this.cameraHelper = new THREE.CameraHelper(
+      this.directionalLight.shadow.camera
+    );
+    this.scene.add(this.cameraHelper);
 
     // アンビエントライト（環境光）
     this.ambientLight = new THREE.AmbientLight(
       ThreeApp.AMBIENT_LIGHT_PARAM.color,
       ThreeApp.AMBIENT_LIGHT_PARAM.intensity
     );
-    this.offscreenScene.add(this.ambientLight);
+    this.scene.add(this.ambientLight);
 
     // シーンに glTF を追加
-    this.offscreenScene.add(this.gltf.scene);
+    this.scene.add(this.gltf.scene);
+
+    // glTF の階層構造をたどり、Mesh が出てきたら影を落とす（cast）設定を行う @@@
+    this.gltf.scene.traverse((object) => {
+      if (object.isMesh === true || object.isSkinnedMesh === true) {
+        object.castShadow = true;
+      }
+    });
+
+    // 床面をプレーンで生成する @@@
+    const planeGeometry = new THREE.PlaneGeometry(250.0, 250.0);
+    const planeMaterial = new THREE.MeshPhongMaterial();
+    this.plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    // プレーンは XY 平面に水平な状態なので、後ろに 90 度分倒す
+    this.plane.rotation.x = -Math.PI * 0.5;
+
+    // 床面は、影を受ける（receive）するよう設定する @@@
+    this.plane.receiveShadow = true;
+
+    // シーンに追加
+    this.scene.add(this.plane);
 
     // 軸ヘルパー
     const axesBarLength = 5.0;
     this.axesHelper = new THREE.AxesHelper(axesBarLength);
-    this.offscreenScene.add(this.axesHelper);
+    this.scene.add(this.axesHelper);
+
+    // アニメーション時間管理のための Clock オブジェクトを生成しておく @@@
+    this.clock = new THREE.Clock();
 
     // コントロール
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-
-    // レンダーターゲットをアスペクト比 1.0 の正方形で生成する @@@
-    this.renderTarget = new THREE.WebGLRenderTarget(
-      ThreeApp.RENDER_TARGET_SIZE,
-      ThreeApp.RENDER_TARGET_SIZE
-    );
-
-    // オフスクリーン用のカメラは、この時点でのカメラの状態を（使いまわして手間軽減のため）クローンしておく @@@
-    this.offscreenCamera = this.camera.clone();
-    // ただし、最終シーンがブラウザのクライアント領域のサイズなのに対し……
-    // レンダーターゲットは正方形なので、アスペクト比は 1.0 に設定を上書きしておく
-    this.offscreenCamera.aspect = 1.0;
-    this.offscreenCamera.updateProjectionMatrix();
-
-    // レンダリング結果を可視化するのに、板ポリゴンを使う @@@
-    const planeGeometry = new THREE.PlaneGeometry(5.0, 5.0);
-    const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    this.plane = new THREE.Mesh(planeGeometry, planeMaterial);
-
-    // 板ポリゴンのマテリアルには、レンダーターゲットに描き込まれた結果を投影したいので……
-    // マテリアルの map プロパティにレンダーターゲットのテクスチャを割り当てておく @@@
-    planeMaterial.map = this.renderTarget.texture;
-
-    // 板ポリゴンをシーンに追加
-    this.scene.add(this.plane);
-
-    // 背景色を出し分けるため、あらかじめ Color オブジェクトを作っておく @@@
-    this.blackColor = new THREE.Color(0x000000);
-    this.whiteColor = new THREE.Color(0xffffff);
   }
 
   /**
@@ -259,29 +275,10 @@ class ThreeApp {
 
     this.controls.update();
 
-    // オフスクリーンレンダリングがリアルタイムであることをわかりやすくするため……
-    // Duck には絶えず動いておいてもらう @@@
-    this.gltf.scene.rotation.y += 0.01;
+    // 前回からの経過時間（デルタ）を取得してミキサーに適用する
+    const delta = this.clock.getDelta();
+    this.mixer.update(delta);
 
-    // まず最初に、オフスクリーンレンダリングを行う @@@
-    this.renderer.setRenderTarget(this.renderTarget);
-    // オフスクリーンレンダリングは常に固定サイズ
-    this.renderer.setSize(
-      ThreeApp.RENDER_TARGET_SIZE,
-      ThreeApp.RENDER_TARGET_SIZE
-    );
-    // わかりやすくするために、背景を黒にしておく
-    this.renderer.setClearColor(this.blackColor, 1.0);
-    // オフスクリーン用のシーン（Duck が含まれるほう）を描画する
-    this.renderer.render(this.offscreenScene, this.offscreenCamera);
-
-    // 次に最終的な画面の出力用のシーンをレンダリングするため null を指定しもとに戻す @@@
-    this.renderer.setRenderTarget(null);
-    // 最終的な出力はウィンドウサイズ
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    // わかりやすくするために、背景を白にしておく
-    this.renderer.setClearColor(this.whiteColor, 1.0);
-    // 板ポリゴンが１枚置かれているだけのシーンを描画する
     this.renderer.render(this.scene, this.camera);
   }
 }
