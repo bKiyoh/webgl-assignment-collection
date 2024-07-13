@@ -1,8 +1,9 @@
-// 精度修飾子で浮動小数点の精度を指定する（省略不可）
 precision mediump float;
 
-void main() {
-  // gl_FragColor が、最終的に画面に出力される色（vec4）
-  gl_FragColor = vec4(1.0);
-}
+// データ型と変数名が頂点シェーダと一致する必要がある点に注意 @@@
+varying vec4 vColor;
 
+void main() {
+  // ここではフラグメントの色（ピクセルの色）は varying 変数をそのまま出力 @@@
+  gl_FragColor = vColor;
+}
