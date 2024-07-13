@@ -158,12 +158,13 @@ class App {
     );
     const colorAttributeLocation = gl.getAttribLocation(this.program, "color");
     // WebGLUtility.enableBuffer は引数を配列で取る仕様なので、いったん配列に入れる
-    const vboArray = [this.vbo, this.colorVBO];
+    const vboArray = [this.positionVBO, this.colorVBO];
     const attributeLocationArray = [
       positionAttributeLocation,
       colorAttributeLocation,
     ];
     const strideArray = [this.positionStride, this.colorStride];
+    // 頂点情報の有効化
     WebGLUtility.enableBuffer(
       gl,
       vboArray,
