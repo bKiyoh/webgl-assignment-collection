@@ -4,13 +4,14 @@ import { WebGLUtility } from "@/lib/webGl/webgl.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
+
   const initAndLoad = async (app) => {
     app.init();
     await app.load();
     app.setupGeometry();
     app.setupLocation();
-    app.setupRendering();
-    app.render();
+    // すべてのセットアップが完了したら描画を開始する
+    app.start();
   };
 
   useEffect(() => {
@@ -31,7 +32,17 @@ export default function Page() {
     };
   }, []);
 
-  return <canvas id="webgl-canvas" />;
+  return (
+    <canvas
+      id="webgl-canvas"
+      style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+      }}
+    />
+  );
 }
 
 /**
@@ -48,11 +59,14 @@ class App {
   gl; // WebGLRenderingContext （WebGL コンテキスト）
   program; // WebGLProgram （プログラムオブジェクト）
   position; // 頂点の座標情報を格納する配列
-  stride; // 頂点の座標を構成する要素の数（ストライド）
-  vbo; // WebGLBuffer （頂点バッファ、Vertex Buffer Object）
-  color; // 頂点カラーの座標情報を格納する配列 @@@
-  colorStride; // 頂点カラーの座標のストライド @@@
-  colorVBO; // 頂点カラー座標の VBO @@@
+  positionStride; // 頂点の座標を構成する要素の数（ストライド）
+  positionVBO; // WebGLBuffer （頂点バッファ、Vertex Buffer Object）
+  color; // 頂点カラーの座標情報を格納する配列
+  colorStride; // 頂点カラーの座標のストライド
+  colorVBO; // 頂点カラー座標の VBO
+  uniformLocation; // uniform 変数のロケーション
+  startTime; // レンダリング開始時のタイムスタンプ
+  isRendering; // レンダリングを行うかどうかのフラグ
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -151,26 +165,26 @@ class App {
    */
   setupLocation() {
     const gl = this.gl;
-    // attribute location の取得 @@@
     const positionAttributeLocation = gl.getAttribLocation(
       this.program,
       "position"
     );
     const colorAttributeLocation = gl.getAttribLocation(this.program, "color");
-    // WebGLUtility.enableBuffer は引数を配列で取る仕様なので、いったん配列に入れる
     const vboArray = [this.positionVBO, this.colorVBO];
     const attributeLocationArray = [
       positionAttributeLocation,
       colorAttributeLocation,
     ];
     const strideArray = [this.positionStride, this.colorStride];
-    // 頂点情報の有効化
     WebGLUtility.enableBuffer(
       gl,
       vboArray,
       attributeLocationArray,
       strideArray
     );
+    this.uniformLocation = {
+      time: gl.getUniformLocation(this.program, "time"),
+    };
   }
 
   /**
@@ -178,17 +192,39 @@ class App {
    */
   setupRendering() {
     const gl = this.gl;
-    // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    // クリアする色を設定する（RGBA で 0.0 ～ 1.0 の範囲で指定する）
     gl.clearColor(0.3, 0.3, 0.3, 1.0);
-    // 実際にクリアする（gl.COLOR_BUFFER_BIT で色をクリアしろ、という指定になる）
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
+  /**
+   * 描画を開始する
+   */
+  start() {
+    this.startTime = Date.now();
+    this.isRendering = true;
+    this.render();
+  }
+
+  /**
+   * 描画を停止する
+   */
+  stop() {
+    this.isRendering = false;
+  }
+
+  /**
+   * レンダリングを行う
+   */
   render() {
     const gl = this.gl;
+    if (this.isRendering === true) {
+      requestAnimationFrame(this.render);
+    }
+    this.setupRendering();
+    const nowTime = (Date.now() - this.startTime) * 0.001;
     gl.useProgram(this.program);
+    gl.uniform1f(this.uniformLocation.time, nowTime);
     // ドローコール（描画命令）
     gl.drawArrays(gl.TRIANGLES, 0, this.position.length / this.positionStride);
   }
