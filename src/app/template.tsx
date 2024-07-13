@@ -7,7 +7,6 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { NavigationMenu } from "@/components/common/NavigationMenu";
 import { LINK_DATA } from "@/constants/linkData";
-import { Progress } from "@/components/ui/progress";
 
 export default function Template({ children }: { children: React.ReactNode }) {
   const currentUrl = usePathname();
@@ -52,17 +51,8 @@ export default function Template({ children }: { children: React.ReactNode }) {
         <div
           className="flex justify-center"
           style={{ display: progress >= 100 ? "none" : "flex" }}
-        >
-          <div className="w-[60%]">
-            <Progress value={progress} />
-          </div>
-        </div>
-        <div
-          className="w-full flex justify-center"
-          style={{ display: progress >= 100 ? "flex" : "none" }}
-        >
-          {children}
-        </div>
+        ></div>
+        <div className="w-full flex justify-center">{children}</div>
         <div className="flex justify-end">
           <Footer />
         </div>

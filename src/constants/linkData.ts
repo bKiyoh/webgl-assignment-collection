@@ -24,4 +24,9 @@ export const LINK_DATA = [
     name: "Vol.4 2024/06/22",
     pressShiftKey: true,
   },
+  {
+    root: "/vol5",
+    name: "Vol.5 2024/07/06",
+    pressShiftKey: false,
+  },
 ];
