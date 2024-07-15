@@ -48,10 +48,6 @@ export default function Template({ children }: { children: React.ReactNode }) {
             <Header pageName={pageName} isAction={isAction} />
           </div>
         </div>
-        <div
-          className="flex justify-center"
-          style={{ display: progress >= 100 ? "none" : "flex" }}
-        ></div>
         <div className="w-full flex justify-center">{children}</div>
         <div className="flex justify-end">
           <Footer />

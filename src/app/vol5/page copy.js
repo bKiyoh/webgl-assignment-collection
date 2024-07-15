@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
-import { blueColors, purpleColors, aquaColors } from "./vol5Color.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
@@ -123,111 +122,82 @@ class App {
    * 頂点属性（頂点ジオメトリ）のセットアップを行う
    */
   setupGeometry() {
-    const createTriangles = (offsetX, offsetY) => [
-      // 1つ目の三角形
-      // 1-1
-      offsetX + 0.0,
-      offsetY + 0.0,
-      0.0,
-      // 1-2
-      offsetX + 0.5,
-      offsetY + 0.0,
-      0.0,
-      // 1-3
-      offsetX + 0.1545,
-      offsetY + 0.4755,
-      0.0,
-      // 2つ目の三角形
-      // 2-1
-      offsetX + 0.0,
-      offsetY + 0.0,
-      0.0,
-      // 2-2
-      offsetX + 0.1545,
-      offsetY + 0.4755,
-      0.0,
-      // 2-3
-      offsetX - 0.4045,
-      offsetY + 0.2939,
-      0.0,
-      // 3つ目の三角形
-      // 3-1
-      offsetX + 0.0,
-      offsetY + 0.0,
-      0.0,
-      // 3-2
-      offsetX - 0.4045,
-      offsetY + 0.2939,
-      0.0,
-      // 3-3
-      offsetX - 0.4045,
-      offsetY - 0.2939,
-      0.0,
-      // 4つ目の三角形
-      // 4-1
-      offsetX + 0.0,
-      offsetY + 0.0,
-      0.0,
-      // 4-2
-      offsetX - 0.4045,
-      offsetY - 0.2939,
-      0.0,
-      // 4-3
-      offsetX + 0.1545,
-      offsetY - 0.4755,
-      0.0,
-      // 5つ目の三角形
-      // 5-1
-      offsetX + 0.0,
-      offsetY + 0.0,
-      0.0,
-      // 5-2
-      offsetX + 0.1545,
-      offsetY - 0.4755,
-      0.0,
-      // 5-3
-      offsetX + 0.5,
-      offsetY + 0.0,
-      0.0,
-    ];
+    const angleStep = (2 * Math.PI) / 5;
 
-    const offset = 0.5;
+    this.position = [];
 
-    this.position = [
-      ...createTriangles(-0.5 + -offset, -0.5 + offset),
-      ...createTriangles(-offset, offset),
-      ...createTriangles(0.5 + -offset, 0.5 + offset),
+    for (let i = 0; i < 5; i++) {
+      const angle = i * angleStep;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
 
-      ...createTriangles(-0.5 + -offset, -0.5 + -offset),
-      ...createTriangles(-offset, -offset),
-      ...createTriangles(0.0, 0.0),
-      ...createTriangles(offset, offset),
-      ...createTriangles(0.5 + offset, 0.5 + offset),
-
-      ...createTriangles(-0.5 + offset, -0.5 + -offset),
-      ...createTriangles(offset, -offset),
-      ...createTriangles(0.5 + offset, 0.5 + -offset),
-    ];
-
+      // 1つ目の三角形を元にして他の三角形を回転させて配置する
+      this.position.push(
+        // 1-1
+        0.05 * cosA - 0.1 * sinA,
+        0.05 * sinA + 0.1 * cosA,
+        0.0,
+        // 1-2
+        0.5 * cosA,
+        0.5 * sinA,
+        0.0,
+        // 1-3
+        0.25 * cosA - 0.433 * sinA,
+        0.25 * sinA + 0.433 * cosA,
+        0.0
+      );
+    }
     // 要素数は XYZ の３つ
     this.positionStride = 3;
     // VBO を生成
     this.positionVBO = WebGLUtility.createVBO(this.gl, this.position);
 
+    // 頂点の色の定義
     this.color = [
-      ...purpleColors,
-      ...blueColors,
-      ...aquaColors,
-      ...aquaColors,
-      ...purpleColors,
-      ...blueColors,
-      ...aquaColors,
-      ...purpleColors,
-      ...purpleColors,
-      ...blueColors,
-      ...aquaColors,
+      //r, g, b, a カラー
+      // 1つ目の三角形
+      // 1-1
+      1.0, 0.0, 0.0, 1.0,
+      // 1-2
+      0.0, 1.0, 0.0, 1.0,
+      // 1-3
+      0.0, 0.0, 1.0, 1.0,
+      // 2つ目の三角形
+      // 2-1
+      1.0, 0.0, 0.0, 1.0,
+      // 2-2
+      0.0, 1.0, 0.0, 1.0,
+      // 2-3
+      0.0, 0.0, 1.0, 1.0,
+      // 3つ目の三角形
+      // 3-1
+      1.0, 0.0, 0.0, 1.0,
+      // 3-2
+      0.0, 1.0, 0.0, 1.0,
+      // 3-3
+      0.0, 0.0, 1.0, 1.0,
+      // 4つ目の三角形
+      // 4-1
+      1.0, 0.0, 0.0, 1.0,
+      // 4-2
+      0.0, 1.0, 0.0, 1.0,
+      // 4-3
+      0.0, 0.0, 1.0, 1.0,
+      // 5つ目の三角形
+      // 5-1
+      1.0, 0.0, 0.0, 1.0,
+      // 5-2
+      0.0, 1.0, 0.0, 1.0,
+      // 5-3
+      0.0, 0.0, 1.0, 1.0,
+      // 5つ目の三角形
+      // 5-1
+      1.0, 0.0, 0.0, 1.0,
+      // 5-2
+      0.0, 1.0, 0.0, 1.0,
+      // 5-3
+      0.0, 0.0, 1.0, 1.0,
     ];
-
     // 要素数は RGBA の４つ
     this.colorStride = 4;
     // VBO を生成
@@ -267,7 +237,7 @@ class App {
   setupRendering() {
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0.99, 0.99, 0.99, 1.0);
+    gl.clearColor(0.3, 0.3, 0.3, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
@@ -296,7 +266,9 @@ class App {
       requestAnimationFrame(this.render);
     }
     this.setupRendering();
+    const nowTime = (Date.now() - this.startTime) * 0.001;
     gl.useProgram(this.program);
+    gl.uniform1f(this.uniformLocation.time, nowTime);
     // ドローコール（描画命令）
     gl.drawArrays(gl.TRIANGLES, 0, this.position.length / this.positionStride);
   }
