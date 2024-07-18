@@ -194,9 +194,11 @@ class App {
     const offset = 0.5;
 
     this.position = [
+      ...createTriangles(-1.0 + -offset, -1.0 + offset),
       ...createTriangles(-0.5 + -offset, -0.5 + offset),
       ...createTriangles(-offset, offset),
       ...createTriangles(0.5 + -offset, 0.5 + offset),
+      ...createTriangles(1.0 + -offset, 1.0 + offset),
 
       ...createTriangles(-0.5 + -offset, -0.5 + -offset),
       ...createTriangles(-offset, -offset),
@@ -204,9 +206,11 @@ class App {
       ...createTriangles(offset, offset),
       ...createTriangles(0.5 + offset, 0.5 + offset),
 
+      ...createTriangles(-1.0 + offset, -1.0 + -offset),
       ...createTriangles(-0.5 + offset, -0.5 + -offset),
       ...createTriangles(offset, -offset),
       ...createTriangles(0.5 + offset, 0.5 + -offset),
+      ...createTriangles(1.0 + offset, 1.0 + -offset),
     ];
 
     // 要素数は XYZ の３つ
@@ -215,16 +219,20 @@ class App {
     this.positionVBO = WebGLUtility.createVBO(this.gl, this.position);
 
     this.color = [
+      ...aquaColors,
       ...purpleColors,
       ...blueColors,
+      ...purpleColors,
       ...aquaColors,
       ...aquaColors,
       ...purpleColors,
       ...blueColors,
+      ...purpleColors,
+      ...aquaColors,
       ...aquaColors,
       ...purpleColors,
-      ...purpleColors,
       ...blueColors,
+      ...purpleColors,
       ...aquaColors,
     ];
 
@@ -239,6 +247,7 @@ class App {
    */
   setupLocation() {
     const gl = this.gl;
+    // attribute
     const positionAttributeLocation = gl.getAttribLocation(
       this.program,
       "position"
@@ -266,8 +275,11 @@ class App {
    */
   setupRendering() {
     const gl = this.gl;
+    // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    // クリアする色を設定する（RGBA で 0.0 ～ 1.0 の範囲で指定する）
     gl.clearColor(0.99, 0.99, 0.99, 1.0);
+    // 実際にクリアする（gl.COLOR_BUFFER_BIT で色をクリアしろ、という指定になる）
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
@@ -292,11 +304,24 @@ class App {
    */
   render() {
     const gl = this.gl;
+
+    // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
       requestAnimationFrame(this.render);
     }
+
+    // ビューポートの設定やクリア処理は毎フレーム呼び出す
     this.setupRendering();
+
+    // 現在までの経過時間を計算し、秒単位に変換する
+    const nowTime = (Date.now() - this.startTime) * 0.001;
+
+    // プグラムオブジェクトを選択
     gl.useProgram(this.program);
+
+    // ロケーションを指定して、uniform 変数の値を更新する（GPU に送る）
+    gl.uniform1f(this.uniformLocation.time, nowTime);
+
     // ドローコール（描画命令）
     gl.drawArrays(gl.TRIANGLES, 0, this.position.length / this.positionStride);
   }

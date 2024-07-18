@@ -116,7 +116,7 @@ export class WebGLUtility {
     const vbo = gl.createBuffer();
     // バッファを gl.ARRAY_BUFFER としてバインドする
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    // バインドしたバッファに Float32Array オブジェクトに変換した配列を設定する
+    // 上でバインドしたバッファに Float32Array オブジェクトに変換した配列を設定する
     gl.bufferData(
       gl.ARRAY_BUFFER,
       new Float32Array(vertexArray),

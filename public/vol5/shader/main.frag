@@ -7,6 +7,9 @@ uniform float time;
 varying vec4 vColor;
 
 void main() {
-  // ここではフラグメントの色（ピクセルの色）は varying 変数をそのまま出力 @@@
-  gl_FragColor = vColor;
+  // 時間の経過からサイン波を作り、絶対値で点滅させるようにする
+  vec3 rgb = vColor.rgb * abs(sin(1.0));
+  // フラグメントの色
+  gl_FragColor = vec4(rgb, vColor.a);
+  
 }
