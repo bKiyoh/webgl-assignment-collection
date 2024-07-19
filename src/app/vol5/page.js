@@ -222,18 +222,18 @@ class App {
       ...aquaColors,
       ...purpleColors,
       ...blueColors,
-      ...purpleColors,
-      ...aquaColors,
       ...aquaColors,
       ...purpleColors,
-      ...blueColors,
-      ...purpleColors,
-      ...aquaColors,
       ...aquaColors,
       ...purpleColors,
       ...blueColors,
+      ...aquaColors,
       ...purpleColors,
       ...aquaColors,
+      ...purpleColors,
+      ...blueColors,
+      ...aquaColors,
+      ...purpleColors,
     ];
 
     // 要素数は RGBA の４つ
