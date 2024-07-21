@@ -1,84 +1,39 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
-import { blueColors, purpleColors, aquaColors } from "./vol5Color.js";
-import { VertexShaderShadingComponent } from "@/components/vol6/VertexShaderShadingComponent.js";
-import { FragmentShaderShadingComponent } from "@/components/vol6/FragmentShaderShadingComponent.js";
+import { blueColors, purpleColors, aquaColors } from "@/app/vol6/vol5Color.js";
 
-export default function Page() {
-  const initializedRefs = [useRef(false), useRef(false)];
+export function VertexShaderShadingComponent() {
+  const initializedRef = useRef(false);
 
   const initAndLoad = async (app) => {
     app.init();
     await app.load();
     app.setupGeometry();
     app.setupLocation();
+    // すべてのセットアップが完了したら描画を開始する
     app.start();
   };
 
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
-    const wrapper1 = document.getElementById("webgl-canvas-1");
-    const wrapper2 = document.getElementById("webgl-canvas-2");
-
-    if (wrapper1 && !initializedRefs[0].current) {
-      const app1 = new App(wrapper1, width / 2, height);
-      initAndLoad(app1);
-      initializedRefs[0].current = true;
-    }
-
-    if (wrapper2 && !initializedRefs[1].current) {
-      const app2 = new App(wrapper2, width / 2, height);
-      initAndLoad(app2);
-      initializedRefs[1].current = true;
+    const wrapper = document.querySelector("#webgl-canvas-1");
+    if (wrapper && !initializedRef.current) {
+      const app = new App(wrapper, width, height);
+      initAndLoad(app);
+      initializedRef.current = true;
     }
 
     return () => {
-      if (wrapper1) {
-        while (wrapper1.firstChild) {
-          wrapper1.removeChild(wrapper1.firstChild);
-        }
-      }
-      if (wrapper2) {
-        while (wrapper2.firstChild) {
-          wrapper2.removeChild(wrapper2.firstChild);
+      if (wrapper) {
+        while (wrapper.firstChild) {
+          wrapper.removeChild(wrapper.firstChild);
         }
       }
     };
   }, []);
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            marginRight: "16px",
-          }}
-        >
-          <span>VertexShaderShading</span>
-          <VertexShaderShadingComponent />{" "}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            marginLeft: "16px",
-          }}
-        >
-          <span>FragmentShaderShading</span>
-          <FragmentShaderShadingComponent />
-        </div>
-      </div>
-    </div>
-  );
+  return <canvas id="webgl-canvas-1" />;
 }
 
 /**
@@ -118,8 +73,12 @@ class App {
     this.canvas = this.wrapper;
     this.gl = WebGLUtility.createWebGLContext(this.canvas);
 
-    this.canvas.width = this.width - App.RENDERER_PARAM.rendererRatio;
-    this.canvas.height = this.height - App.RENDERER_PARAM.rendererRatio;
+    const size = Math.min(
+      this.width - App.RENDERER_PARAM.rendererRatio,
+      this.height - App.RENDERER_PARAM.rendererRatio
+    );
+    this.canvas.width = size;
+    this.canvas.height = size;
   }
 
   /**
@@ -137,8 +96,8 @@ class App {
         reject(error);
       } else {
         // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol5/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol5/shader/main.frag");
+        const VSSource = await WebGLUtility.loadFile("/vol6/shader/main.vert");
+        const FSSource = await WebGLUtility.loadFile("/vol6/shader/main.frag");
         // 無事に読み込めたらシェーダオブジェクトの実体を生成する
         const vertexShader = WebGLUtility.createShaderObject(
           gl,

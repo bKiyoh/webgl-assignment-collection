@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { blueColors, purpleColors, aquaColors } from "@/app/vol6/vol5Color.js";
 
-export function WebGLCanvas() {
+export function FragmentShaderShadingComponent() {
   const initializedRef = useRef(false);
 
   const initAndLoad = async (app) => {
@@ -17,7 +17,7 @@ export function WebGLCanvas() {
 
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
-    const wrapper = document.querySelector("#webgl-canvas");
+    const wrapper = document.querySelector("#webgl-canvas-2");
     if (wrapper && !initializedRef.current) {
       const app = new App(wrapper, width, height);
       initAndLoad(app);
@@ -33,7 +33,7 @@ export function WebGLCanvas() {
     };
   }, []);
 
-  return <canvas id="webgl-canvas" />;
+  return <canvas id="webgl-canvas-2" />;
 }
 
 /**
@@ -96,8 +96,8 @@ class App {
         reject(error);
       } else {
         // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol5/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol5/shader/main.frag");
+        const VSSource = await WebGLUtility.loadFile("/vol6/shader/main.vert");
+        const FSSource = await WebGLUtility.loadFile("/vol6/shader/main.frag");
         // 無事に読み込めたらシェーダオブジェクトの実体を生成する
         const vertexShader = WebGLUtility.createShaderObject(
           gl,
