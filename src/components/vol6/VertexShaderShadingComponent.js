@@ -96,8 +96,12 @@ class App {
         reject(error);
       } else {
         // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol6/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol6/shader/main.frag");
+        const VSSource = await WebGLUtility.loadFile(
+          "/vol6/shader/VertexShaderShading/main.vert"
+        );
+        const FSSource = await WebGLUtility.loadFile(
+          "/vol6/shader/VertexShaderShading/main.frag"
+        );
         // 無事に読み込めたらシェーダオブジェクトの実体を生成する
         const vertexShader = WebGLUtility.createShaderObject(
           gl,
