@@ -1,22 +1,21 @@
-precision mediump float;
 
-// 頂点の位置
 attribute vec3 position;
-// 頂点の色
+attribute vec3 normal; // 頂点法線 @@@
 attribute vec4 color;
-// フラグメントシェーダに渡すための varying 変数
+uniform mat4 mvpMatrix;
 varying vec4 vColor;
 
-// 経過時間を uniform 変数として受け取る
-uniform float time;
+// ライトベクトルはひとまず定数で定義する @@@
+const vec3 light = vec3(1.0, 1.0, 1.0);
 
 void main() {
-    // フラグメントシェーダに送る色の情報を varying 変数に代入
-    vColor = color;
+  // 単位化した法線と単位化したライトベクトルで内積を取る @@@
+  float d = dot(normalize(normal), normalize(light));
 
-    // 一定のサイクルで位置を変化させるためのsin関数の使用
-    float w = 1.0 + 0.05 * sin(time * 2.0 * 3.14159 / 5.0);
+  // 内積の結果を頂点カラーの RGB 成分に乗算する @@@
+  vColor = vec4(color.rgb * d, color.a);
 
-    // 頂点座標の出力
-    gl_Position = vec4(position, w);
+  // MVP 行列と頂点座標を乗算してから出力する
+  gl_Position = mvpMatrix * vec4(position, 1.0);
 }
+

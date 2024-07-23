@@ -20,7 +20,7 @@ export default function Page() {
           }}
         >
           <span>VertexShaderShading</span>
-          <VertexShaderShadingComponent />{" "}
+          <VertexShaderShadingComponent />
         </div>
         <div
           style={{
