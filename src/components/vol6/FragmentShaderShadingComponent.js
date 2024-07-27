@@ -20,11 +20,11 @@ export function FragmentShaderShadingComponent() {
       depthTest: true,
       rotation: true,
     };
-    // バックフェイスカリングの有効・無効 @@@
+    // バックフェイスカリングの有効・無効
     app.setCulling(parameter.culling);
-    // 深度テストの有効・無効 @@@
+    // 深度テストの有効・無効
     app.setDepthTest(parameter.depthTest);
-    // 回転の有無 @@@
+    // 回転の有無
     app.setRotation(parameter.rotation);
   };
 
@@ -64,25 +64,25 @@ class App {
   program; // WebGLProgram （プログラムオブジェクト）
   attributeLocation; // attribute 変数のロケーション
   attributeStride; // attribute 変数のストライド
-  torusGeometry; // トーラスのジオメトリ情報 @@@
-  torusVBO; // トーラスの頂点バッファ @@@
-  torusIBO; // トーラスのインデックスバッファ @@@
+  torusGeometry; // トーラスのジオメトリ情報
+  torusVBO; // トーラスの頂点バッファ
+  torusIBO; // トーラスのインデックスバッファ
   uniformLocation; // uniform 変数のロケーション
   startTime; // レンダリング開始時のタイムスタンプ
   isRendering; // レンダリングを行うかどうかのフラグ
-  isRotation; // オブジェクトを Y 軸回転させるかどうか @@@
+  isRotation; // オブジェクトを Y 軸回転させるかどうか
   camera; // WebGLOrbitCamera のインスタンス
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
     this.width = width;
     this.height = height;
-    // this.resize = this.resize.bind(this);
+    this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
   }
 
   /**
-   * バックフェイスカリングを設定する @@@
+   * バックフェイスカリングを設定する
    * @param {boolean} flag - 設定する値
    */
   setCulling(flag) {
@@ -98,7 +98,7 @@ class App {
   }
 
   /**
-   * 深度テストを設定する @@@
+   * 深度テストを設定する
    * @param {boolean} flag - 設定する値
    */
   setDepthTest(flag) {
@@ -114,7 +114,7 @@ class App {
   }
 
   /**
-   * isRotation を設定する @@@
+   * isRotation を設定する
    * @param {boolean} flag - 設定する値
    */
   setRotation(flag) {
@@ -130,7 +130,9 @@ class App {
 
     // カメラ制御用インスタンスを生成する
     const cameraOption = {
-      distance: 5.0, // Z 軸上の初期位置までの距離
+      distanceX: 0.0, // Z 軸上の初期位置までの距離
+      distanceY: 0.0, // Z 軸上の初期位置までの距離
+      distanceZ: 3.5, // Z 軸上の初期位置までの距離
       min: 1.0, // カメラが寄れる最小距離
       max: 10.0, // カメラが離れられる最大距離
       move: 2.0, // 右ボタンで平行移動する際の速度係数
@@ -206,7 +208,7 @@ class App {
    * 頂点属性（頂点ジオメトリ）のセットアップを行う
    */
   setupGeometry() {
-    // トーラスのジオメトリ情報を取得 @@@
+    // トーラスのジオメトリ情報を取得
     const row = 32;
     const column = 32;
     const innerRadius = 0.4;
@@ -223,7 +225,7 @@ class App {
     // VBO と IBO を生成する
     this.torusVBO = [
       WebGLUtility.createVBO(this.gl, this.torusGeometry.position),
-      WebGLUtility.createVBO(this.gl, this.torusGeometry.normal), // 法線の VBO を生成する @@@
+      WebGLUtility.createVBO(this.gl, this.torusGeometry.normal), // 法線の VBO を生成する
       WebGLUtility.createVBO(this.gl, this.torusGeometry.color),
     ];
     this.torusIBO = WebGLUtility.createIBO(this.gl, this.torusGeometry.index);
@@ -237,7 +239,7 @@ class App {
     // attribute location の取得
     this.attributeLocation = [
       gl.getAttribLocation(this.program, "position"),
-      gl.getAttribLocation(this.program, "normal"), // 法線の attribute location を取得しておく @@@
+      gl.getAttribLocation(this.program, "normal"), // 法線の attribute location を取得しておく
       gl.getAttribLocation(this.program, "color"),
     ];
     // attribute のストライド
@@ -249,7 +251,7 @@ class App {
     // uniform location の取得
     this.uniformLocation = {
       mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
-      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列 @@@
+      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列
     };
   }
 
@@ -301,7 +303,7 @@ class App {
     this.setupRendering();
 
     // モデル座標変換行列（並行移動、回転、拡大縮小）
-    const rotateAxis = Vec3.create(1.0, 1.0, 1.0);
+    const rotateAxis = Vec3.create(0.0, 1.0, 0.0);
     const m =
       this.isRotation === true
         ? Mat4.rotate(Mat4.identity(), nowTime, rotateAxis)
@@ -318,10 +320,10 @@ class App {
     // 行列を乗算して MVP 行列を生成する（掛ける順序に注意）
     const vp = Mat4.multiply(p, v);
     const mvp = Mat4.multiply(vp, m);
-    // モデル座標変換行列の、逆転置行列を生成する @@@
+    // モデル座標変換行列の、逆転置行列を生成する
     const normalMatrix = Mat4.transpose(Mat4.inverse(m));
 
-    // プログラムオブジェクトを選択し uniform 変数を更新する @@@
+    // プログラムオブジェクトを選択し uniform 変数を更新する
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
     gl.uniformMatrix4fv(this.uniformLocation.normalMatrix, false, normalMatrix);

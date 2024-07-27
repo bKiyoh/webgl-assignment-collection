@@ -4,7 +4,7 @@ attribute vec3 normal;
 attribute vec4 color;
 uniform mat4 mvpMatrix;
 uniform mat4 normalMatrix;
-varying vec3 vNormal; // 法線をフラグメントシェーダーに渡すための変数 @@@
+varying vec3 vNormal; // 法線をフラグメントシェーダーに渡すための変数
 varying vec4 vColor;
 
 // ライトベクトルはひとまず定数で定義する
@@ -14,7 +14,7 @@ void main() {
   // 法線をまず行列で変換する
   vec3 n = (normalMatrix * vec4(normal, 0.0)).xyz;
   
-  // 法線をフラグメントシェーダーに渡す @@@
+  // 法線をフラグメントシェーダーに渡す
   vNormal = n;
   
   // 頂点カラーをフラグメントシェーダーに渡す
@@ -26,6 +26,6 @@ void main() {
 
 
 /**
- * NOTE:頂点シェーダーで陰影を作るのと、フラグメントシェーダーで作るので違いがあるのか
+ * NOTE:頂点シェーダーで陰影を作るのと、フラグメントシェーダーで作るので違いがあるのか？
  * 頂点単位の計算と１ピクセルごとの計算になるので後者の方がより美しい陰影ができる
  */
