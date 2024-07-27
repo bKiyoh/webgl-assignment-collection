@@ -72,6 +72,7 @@ class App {
   isRendering; // レンダリングを行うかどうかのフラグ
   isRotation; // オブジェクトを Y 軸回転させるかどうか
   camera; // WebGLOrbitCamera のインスタンス
+  lightPosition;
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -126,6 +127,8 @@ class App {
    */
   init() {
     this.canvas = this.wrapper;
+    // 点光源の位置を設定
+    this.lightPosition = [1.0, 1.0, 1.0];
     this.gl = WebGLUtility.createWebGLContext(this.canvas);
 
     // カメラ制御用インスタンスを生成する
@@ -252,6 +255,7 @@ class App {
     this.uniformLocation = {
       mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
       normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列
+      normalMatrix: gl.getUniformLocation(this.program, "mMatrix"),
     };
   }
 
@@ -325,8 +329,17 @@ class App {
 
     // プログラムオブジェクトを選択し uniform 変数を更新する
     gl.useProgram(this.program);
+
+    // lightPosition ユニフォームをシェーダープログラムに渡す
+    const lightPositionLocation = gl.getUniformLocation(
+      shaderProgram,
+      "lightPosition"
+    );
+    gl.uniform3fv(lightPositionLocation, lightPosition);
+
     gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
     gl.uniformMatrix4fv(this.uniformLocation.normalMatrix, false, normalMatrix);
+    gl.uniformMatrix4fv(this.uniformLocation.mMatrixLocation, false, mMatrix);
 
     // VBO と IBO を設定し、描画する
     WebGLUtility.enableBuffer(
