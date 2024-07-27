@@ -18,11 +18,7 @@ export default function Home() {
       }
     };
   }, []);
-  return (
-    <>
-      <div id="webgl" />
-    </>
-  );
+  return <div id="webgl" />;
 }
 
 /**
