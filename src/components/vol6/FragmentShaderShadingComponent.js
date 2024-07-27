@@ -4,7 +4,6 @@ import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { Vec3, Mat4 } from "@/lib/webGl/math.js";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
-import { Pane } from "@/lib/webGl/tweakpane-4.0.3.min.js"; // tweakpane の読み込み @@@
 
 export function FragmentShaderShadingComponent() {
   const initializedRef = useRef(false);
@@ -14,28 +13,19 @@ export function FragmentShaderShadingComponent() {
     await app.load();
     app.setupGeometry();
     app.setupLocation();
-    // すべてのセットアップが完了したら描画を開始する
     app.start();
 
-    // Tweakpane を使った GUI の設定 @@@
-    const pane = new Pane();
     const parameter = {
       culling: true,
       depthTest: true,
-      rotation: false,
+      rotation: true,
     };
     // バックフェイスカリングの有効・無効 @@@
-    pane.addBinding(parameter, "culling").on("change", (v) => {
-      app.setCulling(v.value);
-    });
+    app.setCulling(parameter.culling);
     // 深度テストの有効・無効 @@@
-    pane.addBinding(parameter, "depthTest").on("change", (v) => {
-      app.setDepthTest(v.value);
-    });
+    app.setDepthTest(parameter.depthTest);
     // 回転の有無 @@@
-    pane.addBinding(parameter, "rotation").on("change", (v) => {
-      app.setRotation(v.value);
-    });
+    app.setRotation(parameter.rotation);
   };
 
   useEffect(() => {
@@ -259,6 +249,7 @@ class App {
     // uniform location の取得
     this.uniformLocation = {
       mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
+      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列 @@@
     };
   }
 
@@ -309,8 +300,8 @@ class App {
     // レンダリングのセットアップ
     this.setupRendering();
 
-    // モデル座標変換行列（フラグが立っている場合だけ回転させる） @@@
-    const rotateAxis = Vec3.create(0.0, 1.0, 0.0);
+    // モデル座標変換行列（並行移動、回転、拡大縮小）
+    const rotateAxis = Vec3.create(1.0, 1.0, 1.0);
     const m =
       this.isRotation === true
         ? Mat4.rotate(Mat4.identity(), nowTime, rotateAxis)
@@ -327,10 +318,13 @@ class App {
     // 行列を乗算して MVP 行列を生成する（掛ける順序に注意）
     const vp = Mat4.multiply(p, v);
     const mvp = Mat4.multiply(vp, m);
+    // モデル座標変換行列の、逆転置行列を生成する @@@
+    const normalMatrix = Mat4.transpose(Mat4.inverse(m));
 
-    // プログラムオブジェクトを選択し uniform 変数を更新する
+    // プログラムオブジェクトを選択し uniform 変数を更新する @@@
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
+    gl.uniformMatrix4fv(this.uniformLocation.normalMatrix, false, normalMatrix);
 
     // VBO と IBO を設定し、描画する
     WebGLUtility.enableBuffer(
