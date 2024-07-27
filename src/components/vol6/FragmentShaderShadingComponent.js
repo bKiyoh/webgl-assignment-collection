@@ -72,7 +72,7 @@ class App {
   isRendering; // レンダリングを行うかどうかのフラグ
   isRotation; // オブジェクトを Y 軸回転させるかどうか
   camera; // WebGLOrbitCamera のインスタンス
-  lightPosition;
+  lightPosition; // 点光源の位置 @@@
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -134,7 +134,7 @@ class App {
     // カメラ制御用インスタンスを生成する
     const cameraOption = {
       distanceX: 0.0, // Z 軸上の初期位置までの距離
-      distanceY: 0.0, // Z 軸上の初期位置までの距離
+      distanceY: 1.5, // Z 軸上の初期位置までの距離
       distanceZ: 3.5, // Z 軸上の初期位置までの距離
       min: 1.0, // カメラが寄れる最小距離
       max: 10.0, // カメラが離れられる最大距離
@@ -255,7 +255,8 @@ class App {
     this.uniformLocation = {
       mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
       normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列
-      normalMatrix: gl.getUniformLocation(this.program, "mMatrix"),
+      mMatrix: gl.getUniformLocation(this.program, "mMatrix"), // シェーダープログラム内のモデル行列の uniform 変数のロケーションを取得 @@@
+      lightPosition: gl.getUniformLocation(this.program, "lightPosition"), // 点光源の位置 @@@
     };
   }
 
@@ -331,15 +332,11 @@ class App {
     gl.useProgram(this.program);
 
     // lightPosition ユニフォームをシェーダープログラムに渡す
-    const lightPositionLocation = gl.getUniformLocation(
-      shaderProgram,
-      "lightPosition"
-    );
-    gl.uniform3fv(lightPositionLocation, lightPosition);
+    gl.uniform3fv(this.uniformLocation.lightPosition, this.lightPosition);
 
     gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
     gl.uniformMatrix4fv(this.uniformLocation.normalMatrix, false, normalMatrix);
-    gl.uniformMatrix4fv(this.uniformLocation.mMatrixLocation, false, mMatrix);
+    gl.uniformMatrix4fv(this.uniformLocation.mMatrix, false, m); /// @@@
 
     // VBO と IBO を設定し、描画する
     WebGLUtility.enableBuffer(

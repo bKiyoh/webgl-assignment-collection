@@ -135,7 +135,7 @@ class App {
     // カメラ制御用インスタンスを生成する
     const cameraOption = {
       distanceX: 0.0, // Z 軸上の初期位置までの距離
-      distanceY: 0.0, // Z 軸上の初期位置までの距離
+      distanceY: 1.5, // Z 軸上の初期位置までの距離
       distanceZ: 3.5, // Z 軸上の初期位置までの距離
       min: 1.0, // カメラが寄れる最小距離
       max: 10.0, // カメラが離れられる最大距離
