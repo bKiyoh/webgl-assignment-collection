@@ -8,7 +8,6 @@ import { Pane } from "@/lib/webGl/tweakpane-4.0.3.min.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
-
   const initAndLoad = async (app) => {
     app.init();
     app.setupPane();
@@ -18,17 +17,14 @@ export default function Page() {
     // すべてのセットアップが完了したら描画を開始する
     app.start();
   };
-
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
-    console.log(height, width);
     const wrapper = document.querySelector("#webgl-canvas");
     if (wrapper && !initializedRef.current) {
       const app = new App(wrapper, width, height);
       initAndLoad(app);
       initializedRef.current = true;
     }
-
     return () => {
       if (wrapper) {
         while (wrapper.firstChild) {
@@ -37,7 +33,6 @@ export default function Page() {
       }
     };
   }, []);
-
   return <canvas id="webgl-canvas" />;
 }
 
@@ -92,6 +87,17 @@ class App {
   }
 
   /**
+   * テクスチャラッピングを設定する @@@
+   * @param {number} wrapping - 設定する値
+   */
+  setTextureWrapping(wrapping) {
+    const gl = this.gl;
+    // 横方向と縦方向にそれぞれ設定できる
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
+  }
+
+  /**
    * 初期化処理を行う
    */
   init() {
@@ -132,6 +138,7 @@ class App {
     const parameter = {
       texture: this.textureVisibility,
       filter: gl.NEAREST,
+      wrapping: gl.CLAMP_TO_EDGE, // wrappingの初期値を追加@@@
     };
     // テクスチャの表示・非表示
     pane.addBinding(parameter, "texture").on("change", (v) => {
@@ -152,15 +159,24 @@ class App {
       .on("change", (v) => {
         this.setTextureFilter(v.value);
       });
-
+    // テクスチャラッピングの種類 @@@
+    pane
+      .addBinding(parameter, "wrapping", {
+        options: {
+          CLAMP_TO_EDGE: gl.CLAMP_TO_EDGE, // クランプ（切り捨て）
+          REPEAT: gl.REPEAT, // 繰り返し
+          MIRRORED_REPEAT: gl.MIRRORED_REPEAT, // 反転繰り返し
+        },
+      })
+      .on("change", (v) => {
+        this.setTextureWrapping(v.value);
+      });
     // TweakpaneのDOM要素の取得
     const paneElement = pane.element;
-
     // スタイルの適用で位置を調整
     paneElement.style.position = "absolute"; // 絶対位置に変更
     paneElement.style.top = "55px"; // 上からの位置
     paneElement.style.right = "55px"; // 右からの位置
-
     // ラベルの幅を調整して二段にならないようにする
     const labels = paneElement.querySelectorAll(".tp-lblv_l"); // Tweakpaneのラベル要素を取得
     for (const label of labels) {
