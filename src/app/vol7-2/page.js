@@ -52,16 +52,18 @@ class App {
   attributeLocation; // attribute 変数のロケーション
   attributeStride; // attribute 変数のストライド
   uniformLocation; // uniform 変数のロケーション
-  planeGeometry; // 板ポリゴンのジオメトリ情報
-  planeVBO; // 板ポリゴンの頂点バッファ
-  planeIBO; // 板ポリゴンのインデックスバッファ
+  cubeGeometry; // キューブのジオメトリ情報 @@@
+  cubeVBO; // キューブの頂点バッファ @@@
+  cubeIBO; // キューブのインデックスバッファ @@@
+  torusGeometry; // トーラスのジオメトリ情報 @@@
+  torusVBO; // トーラスの頂点バッファ @@@
+  torusIBO; // トーラスのインデックスバッファ @@@
   startTime; // レンダリング開始時のタイムスタンプ
   camera; // WebGLOrbitCamera のインスタンス
   isRendering; // レンダリングを行うかどうかのフラグ
   texture; // テクスチャのインスタンス
-  textureVisibility; // テクスチャの可視性
-  isBlending; // ブレンディングを行うかどうかのフラグ @@@
-  globalAlpha; // グローバルなアルファ値 @@@
+  isBackground; // 背景の描画を行うかどうかのフラグ @@@
+  refractiveIndex; // 屈折率 @@@
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -69,36 +71,6 @@ class App {
     this.height = height - App.RENDERER_PARAM.rendererRatio;
     this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
-  }
-
-  /**
-   * ブレンディングを設定する @@@
-   * @param {boolean} flag - 設定する値
-   */
-  setBlending(flag) {
-    const gl = this.gl;
-    if (flag === true) {
-      gl.enable(gl.BLEND);
-    } else {
-      gl.disable(gl.BLEND);
-    }
-  }
-
-  /**
-   * テクスチャのフィルタを設定する @@@
-   * ※現在バインドされているアクティブなテクスチャが更新される点に注意
-   * @param {number} filter - 設定する値
-   */
-  setTextureFilter(filter) {
-    const gl = this.gl;
-    // 縮小フィルタは常に指定どおり
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
-    // 拡大フィルタはミップマップ系は使えない
-    if (filter === gl.NEAREST) {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    } else {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    }
   }
 
   /**
@@ -125,48 +97,39 @@ class App {
     // リサイズイベントの設定
     window.addEventListener("resize", this.resize, false);
 
-    // 深度テストは初期状態で有効
+    // バックフェイスカリングと深度テストは初期状態で有効
+    this.gl.enable(this.gl.CULL_FACE);
     this.gl.enable(this.gl.DEPTH_TEST);
 
-    // 初期状態ではテクスチャが見えているようにする
-    this.textureVisibility = true;
+    // 初期状態では背景の描画は有効となるように設定する @@@
+    this.isBackground = true;
 
-    // 初期状態ではブレンディングは無効化 @@@
-    this.isBlending = false;
-
-    // 初期状態ではアルファ値は完全な不透明となるよう設定する @@@
-    this.globalAlpha = 1.0;
+    // 屈折率の初期値 @@@
+    this.refractiveIndex = 1.5;
   }
 
   /**
    * tweakpane の初期化処理
    */
   setupPane() {
-    const gl = this.gl;
     // Tweakpane を使った GUI の設定
     const pane = new Pane();
     const parameter = {
-      texture: this.textureVisibility,
-      blending: this.isBlending,
-      alpha: this.globalAlpha,
+      background: this.isBackground,
+      refract: this.refractiveIndex,
     };
-    // テクスチャの表示・非表示
-    pane.addBinding(parameter, "texture").on("change", (v) => {
-      this.textureVisibility = v.value;
+    // 背景の描画を行うかどうか @@@
+    pane.addBinding(parameter, "background").on("change", (v) => {
+      this.isBackground = v.value;
     });
-    // ブレンドを行うかどうか @@@
-    pane.addBinding(parameter, "blending").on("change", (v) => {
-      this.isBlending = v.value;
-      this.setBlending(v.value);
-    });
-    // グローバルなアルファ値 @@@
+    // 屈折率 @@@
     pane
-      .addBinding(parameter, "alpha", {
-        min: 0.0,
-        max: 1.0,
+      .addBinding(parameter, "refract", {
+        min: 1.0,
+        max: 3.0,
       })
       .on("change", (v) => {
-        this.globalAlpha = v.value;
+        this.refractiveIndex = v.value;
       });
 
     // TweakpaneのDOM要素の取得
@@ -197,7 +160,6 @@ class App {
    */
   load() {
     return new Promise(async (resolve, reject) => {
-      // 変数に WebGL コンテキストを代入しておく（コード記述の最適化）
       const gl = this.gl;
       // WebGL コンテキストがあるかどうか確認する
       if (gl == null) {
@@ -205,9 +167,13 @@ class App {
         const error = new Error("not initialized");
         reject(error);
       } else {
-        // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol7/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol7/shader/main.frag");
+        // シェーダのソースコードを読み込みシェーダとプログラムオブジェクトを生成する
+        const VSSource = await WebGLUtility.loadFile(
+          "/vol7-2/shader/main.vert"
+        );
+        const FSSource = await WebGLUtility.loadFile(
+          "/vol7-2/shader/main.frag"
+        );
         // 無事に読み込めたらシェーダオブジェクトの実体を生成する
         const vertexShader = WebGLUtility.createShaderObject(
           gl,
@@ -226,7 +192,30 @@ class App {
         );
         // 画像を読み込み、テクスチャを初期化する
         const image = await WebGLUtility.loadImage("/vol7/sample.jpg");
-        this.texture = WebGLUtility.createTexture(gl, image);
+        // キューブマップ用のファイル名配列 @@@
+        const sourceArray = [
+          "/vol7-2/cube_PX.png",
+          "/vol7-2/cube_PY.png",
+          "/vol7-2/cube_PZ.png",
+          "/vol7-2/cube_NX.png",
+          "/vol7-2/cube_NY.png",
+          "/vol7-2/cube_NZ.png",
+        ];
+        // キューブマップ用のターゲット定数配列 @@@
+        const targetArray = [
+          gl.TEXTURE_CUBE_MAP_POSITIVE_X,
+          gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
+          gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
+          gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
+          gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
+          gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
+        ];
+        // キューブマップ用画像の読み込み @@@
+        this.texture = await WebGLUtility.createCubeTextureFromFile(
+          gl,
+          sourceArray,
+          targetArray
+        );
         // Promsie を解決
         resolve();
       }
@@ -237,19 +226,33 @@ class App {
    * 頂点属性（頂点ジオメトリ）のセットアップを行う
    */
   setupGeometry() {
-    // プレーンジオメトリの情報を取得
-    const size = 2.0;
     const color = [1.0, 1.0, 1.0, 1.0];
-    this.planeGeometry = WebGLGeometry.plane(size, size, color);
 
-    // VBO と IBO を生成する
-    this.planeVBO = [
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.position),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.normal),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.color),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.texCoord),
+    // cube @@@
+    const size = 2.0;
+    this.cubeGeometry = WebGLGeometry.cube(size, color);
+    this.cubeVBO = [
+      WebGLUtility.createVBO(this.gl, this.cubeGeometry.position),
+      WebGLUtility.createVBO(this.gl, this.cubeGeometry.normal),
     ];
-    this.planeIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
+    this.cubeIBO = WebGLUtility.createIBO(this.gl, this.cubeGeometry.index);
+
+    // torus @@@
+    const segment = 64;
+    const inner = 0.4;
+    const outer = 0.8;
+    this.torusGeometry = WebGLGeometry.torus(
+      segment,
+      segment,
+      inner,
+      outer,
+      color
+    );
+    this.torusVBO = [
+      WebGLUtility.createVBO(this.gl, this.torusGeometry.position),
+      WebGLUtility.createVBO(this.gl, this.torusGeometry.normal),
+    ];
+    this.torusIBO = WebGLUtility.createIBO(this.gl, this.torusGeometry.index);
   }
 
   /**
@@ -261,18 +264,18 @@ class App {
     this.attributeLocation = [
       gl.getAttribLocation(this.program, "position"),
       gl.getAttribLocation(this.program, "normal"),
-      gl.getAttribLocation(this.program, "color"),
-      gl.getAttribLocation(this.program, "texCoord"),
     ];
     // attribute のストライド
-    this.attributeStride = [3, 3, 4, 2];
-    // uniform location の取得
+    this.attributeStride = [3, 3];
+    // uniform location の取得 @@@
     this.uniformLocation = {
-      mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
-      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"),
-      textureUnit: gl.getUniformLocation(this.program, "textureUnit"),
-      useTexture: gl.getUniformLocation(this.program, "useTexture"), // テクスチャを使うかどうかのフラグ @@@
-      globalAlpha: gl.getUniformLocation(this.program, "globalAlpha"), // グローバルアルファ @@@
+      mMatrix: gl.getUniformLocation(this.program, "mMatrix"), // モデル座標変換行列
+      mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"), // MVP 行列
+      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"), // 法線変換行列
+      refraction: gl.getUniformLocation(this.program, "refraction"), // 反射するかどうか
+      refractiveIndex: gl.getUniformLocation(this.program, "refractiveIndex"), // 屈折率 @@@
+      eyePosition: gl.getUniformLocation(this.program, "eyePosition"), // 視点の座標
+      textureUnit: gl.getUniformLocation(this.program, "textureUnit"), // テクスチャユニット
     };
   }
 
@@ -288,11 +291,6 @@ class App {
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    // ブレンドの設定 @@@
-    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
-    // その他の設定例（加算合成＋アルファで透明）
-    // gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE);
   }
 
   /**
@@ -302,7 +300,7 @@ class App {
     const gl = this.gl;
     // 途中でテクスチャを切り替えないためここでバインドしておく @@@
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
     // レンダリング開始時のタイムスタンプを取得しておく
     this.startTime = Date.now();
     // レンダリングを行っているフラグを立てておく
@@ -331,70 +329,99 @@ class App {
     const nowTime = (Date.now() - this.startTime) * 0.001;
     // レンダリングのセットアップ
     this.setupRendering();
-    // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
-    const m = Mat4.identity();
+
     // ビュー・プロジェクション座標変換行列
     const v = this.camera.update();
     const fovy = 45;
-    const aspect = window.innerWidth / window.innerHeight;
+    const aspect = this.canvas.width / this.canvas.height;
     const near = 0.1;
-    const far = 10.0;
+    const far = 15.0;
     const p = Mat4.perspective(fovy, aspect, near, far);
-    // 行列を乗算して MVP 行列を生成する（掛ける順序に注意）
     const vp = Mat4.multiply(p, v);
-
-    // VBO と IBO を設定し、描画する
-    WebGLUtility.enableBuffer(
-      gl,
-      this.planeVBO,
-      this.attributeLocation,
-      this.attributeStride,
-      this.planeIBO
-    );
 
     // プログラムオブジェクトを選択し uniform 変数を更新する
     gl.useProgram(this.program);
 
     // 汎用的な uniform 変数は先にまとめて設定しておく
+    gl.uniform3fv(this.uniformLocation.eyePosition, this.camera.position);
     gl.uniform1i(this.uniformLocation.textureUnit, 0);
-    gl.uniform1i(this.uniformLocation.useTexture, this.textureVisibility);
-    gl.uniform1f(this.uniformLocation.globalAlpha, this.globalAlpha); // グローバルアルファ @@@
+    gl.uniform1f(this.uniformLocation.refractiveIndex, this.refractiveIndex); // 屈折率 @@@
 
-    // １つ目のポリゴンを描画する @@@
-    {
-      // モデル座標変換行列（１つ目は奥）
-      const m = Mat4.translate(Mat4.identity(), Vec3.create(0.0, 0.0, -0.5));
+    // まず背景用のキューブを描画する @@@
+    if (this.isBackground === true) {
+      // VBO と IBO
+      WebGLUtility.enableBuffer(
+        gl,
+        this.cubeVBO,
+        this.attributeLocation,
+        this.attributeStride,
+        this.cubeIBO
+      );
+      // バックフェイスカリングは表面をカリング
+      gl.cullFace(gl.FRONT);
+      // 深度は書き込まない（背景なので深度テストに干渉させないため）
+      gl.depthMask(false);
+      // 各種行列を作る
+      const m = Mat4.identity();
       const mvp = Mat4.multiply(vp, m);
       const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+      // 背景用のキューブからは平行移動成分を消す
+      // ※モデル・ビューのいずれの平行移動も無視する
+      mvp[12] = 0.0;
+      mvp[13] = 0.0;
+      mvp[14] = 0.0;
+      mvp[15] = 1.0;
+      // シェーダに各種パラメータを送る
+      gl.uniformMatrix4fv(this.uniformLocation.mMatrix, false, m);
       gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
       gl.uniformMatrix4fv(
         this.uniformLocation.normalMatrix,
         false,
         normalMatrix
       );
+      gl.uniform1i(this.uniformLocation.refraction, false); // 背景なので反射はしない
       gl.drawElements(
         gl.TRIANGLES,
-        this.planeGeometry.index.length,
+        this.cubeGeometry.index.length,
         gl.UNSIGNED_SHORT,
         0
       );
     }
 
-    // ２つ目のポリゴンを描画する @@@
+    // トーラスを描画する @@@
     {
-      // モデル座標変換行列（２つ目は手前）
-      const m = Mat4.translate(Mat4.identity(), Vec3.create(0.0, 0.0, 0.5));
+      // VBO と IBO
+      WebGLUtility.enableBuffer(
+        gl,
+        this.torusVBO,
+        this.attributeLocation,
+        this.attributeStride,
+        this.torusIBO
+      );
+      // バックフェイスカリングは裏面をカリング
+      gl.cullFace(gl.BACK);
+      // 深度は普通に書き込む状態に戻す
+      gl.depthMask(true);
+      // 各種行列を作る
+      const m = Mat4.rotate(
+        Mat4.identity(),
+        nowTime,
+        Vec3.create(1.0, 1.0, 0.0)
+      );
       const mvp = Mat4.multiply(vp, m);
       const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+      // シェーダに各種パラメータを送る
+      gl.uniformMatrix4fv(this.uniformLocation.mMatrix, false, m);
       gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
       gl.uniformMatrix4fv(
         this.uniformLocation.normalMatrix,
         false,
         normalMatrix
       );
+      gl.uniform1i(this.uniformLocation.refraction, true); // 風景を反射する
       gl.drawElements(
         gl.TRIANGLES,
-        this.planeGeometry.index.length,
+        this.torusGeometry.index.length,
         gl.UNSIGNED_SHORT,
         0
       );
