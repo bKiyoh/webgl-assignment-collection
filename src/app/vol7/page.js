@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
-import { Mat4 } from "@/lib/webGl/math";
+import { Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
 import { Pane } from "@/lib/webGl/tweakpane-4.0.3.min.js";
@@ -60,6 +60,8 @@ class App {
   isRendering; // レンダリングを行うかどうかのフラグ
   texture; // テクスチャのインスタンス
   textureVisibility; // テクスチャの可視性
+  isBlending; // ブレンディングを行うかどうかのフラグ @@@
+  globalAlpha; // グローバルなアルファ値 @@@
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -67,6 +69,19 @@ class App {
     this.height = height - App.RENDERER_PARAM.rendererRatio;
     this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
+  }
+
+  /**
+   * ブレンディングを設定する @@@
+   * @param {boolean} flag - 設定する値
+   */
+  setBlending(flag) {
+    const gl = this.gl;
+    if (flag === true) {
+      gl.enable(gl.BLEND);
+    } else {
+      gl.disable(gl.BLEND);
+    }
   }
 
   /**
@@ -84,17 +99,6 @@ class App {
     } else {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     }
-  }
-
-  /**
-   * テクスチャラッピングを設定する @@@
-   * @param {number} wrapping - 設定する値
-   */
-  setTextureWrapping(wrapping) {
-    const gl = this.gl;
-    // 横方向と縦方向にそれぞれ設定できる
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
   }
 
   /**
@@ -126,6 +130,12 @@ class App {
 
     // 初期状態ではテクスチャが見えているようにする
     this.textureVisibility = true;
+
+    // 初期状態ではブレンディングは無効化 @@@
+    this.isBlending = false;
+
+    // 初期状態ではアルファ値は完全な不透明となるよう設定する @@@
+    this.globalAlpha = 1.0;
   }
 
   /**
@@ -137,40 +147,28 @@ class App {
     const pane = new Pane();
     const parameter = {
       texture: this.textureVisibility,
-      filter: gl.NEAREST,
-      wrapping: gl.CLAMP_TO_EDGE, // wrappingの初期値を追加@@@
+      blending: this.isBlending,
+      alpha: this.globalAlpha,
     };
     // テクスチャの表示・非表示
     pane.addBinding(parameter, "texture").on("change", (v) => {
       this.textureVisibility = v.value;
     });
-    // フィルタの種類 @@@
+    // ブレンドを行うかどうか @@@
+    pane.addBinding(parameter, "blending").on("change", (v) => {
+      this.isBlending = v.value;
+      this.setBlending(v.value);
+    });
+    // グローバルなアルファ値 @@@
     pane
-      .addBinding(parameter, "filter", {
-        options: {
-          NEAREST: gl.NEAREST, // 最近傍（Nearest neighbor）
-          LINEAR: gl.LINEAR, // 双線形補間（Bilinear）
-          NEAREST_MIPMAP_NEAREST: gl.NEAREST_MIPMAP_NEAREST, // 最適なミップマップで最近傍
-          NEAREST_MIPMAP_LINEAR: gl.NEAREST_MIPMAP_LINEAR, // ２つのミップマップで最近傍
-          LINEAR_MIPMAP_NEAREST: gl.LINEAR_MIPMAP_NEAREST, // 最適なミップマップで双線形補間
-          LINEAR_MIPMAP_LINEAR: gl.LINEAR_MIPMAP_LINEAR, // ２つのミップマップで双線形補間
-        },
+      .addBinding(parameter, "alpha", {
+        min: 0.0,
+        max: 1.0,
       })
       .on("change", (v) => {
-        this.setTextureFilter(v.value);
+        this.globalAlpha = v.value;
       });
-    // テクスチャラッピングの種類 @@@
-    pane
-      .addBinding(parameter, "wrapping", {
-        options: {
-          CLAMP_TO_EDGE: gl.CLAMP_TO_EDGE, // クランプ（切り捨て）
-          REPEAT: gl.REPEAT, // 繰り返し
-          MIRRORED_REPEAT: gl.MIRRORED_REPEAT, // 反転繰り返し
-        },
-      })
-      .on("change", (v) => {
-        this.setTextureWrapping(v.value);
-      });
+
     // TweakpaneのDOM要素の取得
     const paneElement = pane.element;
     // スタイルの適用で位置を調整
@@ -274,6 +272,7 @@ class App {
       normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"),
       textureUnit: gl.getUniformLocation(this.program, "textureUnit"),
       useTexture: gl.getUniformLocation(this.program, "useTexture"), // テクスチャを使うかどうかのフラグ @@@
+      globalAlpha: gl.getUniformLocation(this.program, "globalAlpha"), // グローバルアルファ @@@
     };
   }
 
@@ -289,6 +288,11 @@ class App {
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // ブレンドの設定 @@@
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
+    // その他の設定例（加算合成＋アルファで透明）
+    // gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE);
   }
 
   /**
@@ -338,15 +342,7 @@ class App {
     const p = Mat4.perspective(fovy, aspect, near, far);
     // 行列を乗算して MVP 行列を生成する（掛ける順序に注意）
     const vp = Mat4.multiply(p, v);
-    const mvp = Mat4.multiply(vp, m);
-    // モデル座標変換行列の、逆転置行列を生成する
-    const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-    // プログラムオブジェクトを選択し uniform 変数を更新する
-    gl.useProgram(this.program);
-    gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
-    gl.uniformMatrix4fv(this.uniformLocation.normalMatrix, false, normalMatrix);
-    gl.uniform1i(this.uniformLocation.textureUnit, 0);
-    gl.uniform1i(this.uniformLocation.useTexture, this.textureVisibility);
+
     // VBO と IBO を設定し、描画する
     WebGLUtility.enableBuffer(
       gl,
@@ -355,11 +351,53 @@ class App {
       this.attributeStride,
       this.planeIBO
     );
-    gl.drawElements(
-      gl.TRIANGLES,
-      this.planeGeometry.index.length,
-      gl.UNSIGNED_SHORT,
-      0
-    );
+
+    // プログラムオブジェクトを選択し uniform 変数を更新する
+    gl.useProgram(this.program);
+
+    // 汎用的な uniform 変数は先にまとめて設定しておく
+    gl.uniform1i(this.uniformLocation.textureUnit, 0);
+    gl.uniform1i(this.uniformLocation.useTexture, this.textureVisibility);
+    gl.uniform1f(this.uniformLocation.globalAlpha, this.globalAlpha); // グローバルアルファ @@@
+
+    // １つ目のポリゴンを描画する @@@
+    {
+      // モデル座標変換行列（１つ目は奥）
+      const m = Mat4.translate(Mat4.identity(), Vec3.create(0.0, 0.0, -0.5));
+      const mvp = Mat4.multiply(vp, m);
+      const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+      gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
+      gl.uniformMatrix4fv(
+        this.uniformLocation.normalMatrix,
+        false,
+        normalMatrix
+      );
+      gl.drawElements(
+        gl.TRIANGLES,
+        this.planeGeometry.index.length,
+        gl.UNSIGNED_SHORT,
+        0
+      );
+    }
+
+    // ２つ目のポリゴンを描画する @@@
+    {
+      // モデル座標変換行列（２つ目は手前）
+      const m = Mat4.translate(Mat4.identity(), Vec3.create(0.0, 0.0, 0.5));
+      const mvp = Mat4.multiply(vp, m);
+      const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+      gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
+      gl.uniformMatrix4fv(
+        this.uniformLocation.normalMatrix,
+        false,
+        normalMatrix
+      );
+      gl.drawElements(
+        gl.TRIANGLES,
+        this.planeGeometry.index.length,
+        gl.UNSIGNED_SHORT,
+        0
+      );
+    }
   }
 }

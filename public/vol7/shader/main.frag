@@ -1,21 +1,20 @@
 precision mediump float;
 
 uniform sampler2D textureUnit;
-uniform bool useTexture; // テクスチャを使うかどうか @@@
+uniform bool useTexture;
+uniform float globalAlpha; // グローバルアルファ @@@
 
 varying vec4 vColor;
 varying vec2 vTexCoord;
 
 void main() {
-// テクスチャ座標が範囲外まで広がるように補正する @@@
-  vec2 coord = vTexCoord * 2.0 - 0.5;
-
   // テクスチャから、テクスチャ座標の位置の色をピックする
-  vec4 textureColor = texture2D(textureUnit, coord);
+  vec4 textureColor = texture2D(textureUnit, vTexCoord);
 
-  // テクスチャを使うかどうかのフラグによって分岐 @@@
-  vec4 outColor = useTexture ? textureColor : vec4(coord, 0.0, 1.0);
+  // テクスチャを使うかどうかのフラグによって分岐
+  vec4 outColor = useTexture ? textureColor : vec4(vTexCoord, 0.0, 1.0);
 
-  gl_FragColor = vColor * outColor;
+  // グローバルアルファ値を乗算してから出力する @@@
+  gl_FragColor = vColor * outColor * vec4(vec3(1.0), globalAlpha);
 }
 
