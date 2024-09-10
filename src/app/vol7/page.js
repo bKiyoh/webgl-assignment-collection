@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
-import { Vec3, Mat4 } from "@/lib/webGl/math";
+import { Vec2, Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
 import { Pane } from "@/lib/webGl/tweakpane-4.0.3.min.js";
@@ -59,6 +59,7 @@ class App {
   camera; // WebGLOrbitCamera のインスタンス
   isRendering; // レンダリングを行うかどうかのフラグ
   texture; // テクスチャのインスタンス
+  texture1; // テクスチャのインスタンス
   textureVisibility; // テクスチャの可視性
   isBlending; // ブレンディングを行うかどうかのフラグ @@@
   globalAlpha; // グローバルなアルファ値 @@@
@@ -226,7 +227,9 @@ class App {
         );
         // 画像を読み込み、テクスチャを初期化する
         const image = await WebGLUtility.loadImage("/vol7/sample.jpg");
+        const image1 = await WebGLUtility.loadImage("/vol7/sample1.png");
         this.texture = WebGLUtility.createTexture(gl, image);
+        this.texture1 = WebGLUtility.createTexture(gl, image1);
         // Promsie を解決
         resolve();
       }
@@ -270,7 +273,14 @@ class App {
     this.uniformLocation = {
       mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
       normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"),
+      intensity: gl.getUniformLocation(this.program, "intensity"),
+      progress: gl.getUniformLocation(this.program, "progress"),
+      time: gl.getUniformLocation(this.program, "time"),
+      windowSize: gl.getUniformLocation(this.program, "windowSize"),
+      textureSize: gl.getUniformLocation(this.program, "textureSize"),
+      resolution: gl.getUniformLocation(this.program, "resolution"),
       textureUnit: gl.getUniformLocation(this.program, "textureUnit"),
+      textureUnit1: gl.getUniformLocation(this.program, "textureUnit1"),
       useTexture: gl.getUniformLocation(this.program, "useTexture"), // テクスチャを使うかどうかのフラグ @@@
       globalAlpha: gl.getUniformLocation(this.program, "globalAlpha"), // グローバルアルファ @@@
     };
@@ -303,6 +313,8 @@ class App {
     // 途中でテクスチャを切り替えないためここでバインドしておく @@@
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture1);
     // レンダリング開始時のタイムスタンプを取得しておく
     this.startTime = Date.now();
     // レンダリングを行っているフラグを立てておく
@@ -323,16 +335,21 @@ class App {
    */
   render() {
     const gl = this.gl;
+
     // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
       requestAnimationFrame(this.render);
     }
+
     // 現在までの経過時間
     const nowTime = (Date.now() - this.startTime) * 0.001;
+
     // レンダリングのセットアップ
     this.setupRendering();
+
     // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
     const m = Mat4.identity();
+
     // ビュー・プロジェクション座標変換行列
     const v = this.camera.update();
     const fovy = 45;
@@ -352,11 +369,29 @@ class App {
       this.planeIBO
     );
 
+    // サイズを定義
+    let windowSize = Vec2.create(window.innerWidth, window.innerHeight);
+    let textureSize = Vec2.create(1024, 1024);
+
     // プログラムオブジェクトを選択し uniform 変数を更新する
     gl.useProgram(this.program);
 
     // 汎用的な uniform 変数は先にまとめて設定しておく
+    const progressValue = (Math.sin(nowTime) + 1.0) / 2.0;
+    gl.uniform1f(this.uniformLocation.intensity, 1.0); // ここで 50.0 などの値を設定します
+    gl.uniform1f(this.uniformLocation.progress, progressValue); // ここで 0.0 〜 1.0 の値を設定します
+    gl.uniform1f(this.uniformLocation.time, nowTime);
+    gl.uniform2fv(this.uniformLocation.windowSize, windowSize); //表示したいサイズ
+    gl.uniform2fv(this.uniformLocation.textureSize, textureSize); // 画像のサイズ
+    gl.uniform4f(
+      this.uniformLocation.resolution,
+      this.width,
+      this.height,
+      1.0 / this.width,
+      1.0 / this.height
+    );
     gl.uniform1i(this.uniformLocation.textureUnit, 0);
+    gl.uniform1i(this.uniformLocation.textureUnit1, 1);
     gl.uniform1i(this.uniformLocation.useTexture, this.textureVisibility);
     gl.uniform1f(this.uniformLocation.globalAlpha, this.globalAlpha); // グローバルアルファ @@@
 
