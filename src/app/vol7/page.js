@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
-import { Vec2, Vec3, Mat4 } from "@/lib/webGl/math";
+import { Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 
 export default function Page() {
@@ -57,6 +57,7 @@ class App {
   isRendering; // レンダリングを行うかどうかのフラグ
   texture; // テクスチャのインスタンス
   texture1; // テクスチャのインスタンス
+  texture2; // テクスチャのインスタンス
   cameraPosition;
   cameraTarget;
   upDirection;
@@ -154,8 +155,10 @@ class App {
         // 画像を読み込み、テクスチャを初期化する
         const image = await WebGLUtility.loadImage("/vol7/sample.jpg");
         const image1 = await WebGLUtility.loadImage("/vol7/sample1.jpg");
+        const image2 = await WebGLUtility.loadImage("/vol7/sample2.jpg");
         this.texture = WebGLUtility.createTexture(gl, image);
         this.texture1 = WebGLUtility.createTexture(gl, image1);
+        this.texture2 = WebGLUtility.createTexture(gl, image2);
         // Promsie を解決
         resolve();
       }
@@ -170,8 +173,8 @@ class App {
     const height = this.canvas.height;
 
     // アスペクト比を維持しながら、ウィンドウのサイズいっぱいにポリゴンを表示
-    const sizeWidth = width / 166;
-    const sizeHeight = height / 153;
+    const sizeWidth = width / 160;
+    const sizeHeight = height / 150;
 
     const color = [1.0, 1.0, 1.0, 1.0];
     this.planeGeometry = WebGLGeometry.plane(sizeWidth, sizeHeight, color);
@@ -212,6 +215,7 @@ class App {
       resolution: gl.getUniformLocation(this.program, "resolution"),
       textureUnit: gl.getUniformLocation(this.program, "textureUnit"),
       textureUnit1: gl.getUniformLocation(this.program, "textureUnit1"),
+      textureUnit2: gl.getUniformLocation(this.program, "textureUnit2"),
       useTexture: gl.getUniformLocation(this.program, "useTexture"), // テクスチャを使うかどうかのフラグ @@@
     };
   }
@@ -245,6 +249,8 @@ class App {
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texture1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture2);
     // レンダリング開始時のタイムスタンプを取得しておく
     this.startTime = Date.now();
     // レンダリングを行っているフラグを立てておく
@@ -307,9 +313,10 @@ class App {
     gl.useProgram(this.program);
 
     // 汎用的な uniform 変数は先にまとめて設定しておく
-    const progressValue = (Math.sin(nowTime) + 1.0) / 2.0;
+    const slowFactor = 3.0; // ここでスピードを調整するためのスケーリング値
+    const progressValue = (Math.sin(nowTime / slowFactor) + 1.0) / 2.0;
     gl.uniform1f(this.uniformLocation.intensity, 1.0); // ここで 50.0 などの値を設定します
-    gl.uniform1f(this.uniformLocation.progress, progressValue); // ここで 0.0 〜 1.0 の値を設定します
+    gl.uniform1f(this.uniformLocation.progress, progressValue);
     gl.uniform1f(this.uniformLocation.time, nowTime);
     gl.uniform4f(
       this.uniformLocation.resolution,
@@ -320,6 +327,7 @@ class App {
     );
     gl.uniform1i(this.uniformLocation.textureUnit, 0);
     gl.uniform1i(this.uniformLocation.textureUnit1, 1);
+    gl.uniform1i(this.uniformLocation.textureUnit2, 2);
     // １つ目のポリゴンを描画する @@@
     {
       // モデル座標変換行列（１つ目は奥）

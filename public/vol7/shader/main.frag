@@ -2,6 +2,7 @@ precision mediump float;
 
 uniform sampler2D textureUnit;
 uniform sampler2D textureUnit1;
+uniform sampler2D textureUnit2;
 uniform float intensity;
 uniform float progress; 
 varying vec2 vTexCoord;
@@ -50,29 +51,42 @@ void main() {
   // `mod(progress, 1.0)` を使って `progress` をループさせる
   float modProgress = mod(progress, 1.0);
 
-  vec2 uv1 = newUV + d * modProgress / 5.0 * (1.0 + hn / 2.0);
-  vec2 uv2 = newUV - d * (1.0 - modProgress) / 5.0 * (1.0 + hn / 2.0);
-
+  vec2 uv = newUV + d * modProgress / 5.0 * (1.0 + hn / 2.0);
+  vec2 uv1 = newUV - d * (1.0 - modProgress) / 5.0 * (1.0 + hn / 2.0);
+  vec2 uv2 = newUV + d * modProgress / 10.0 * (1.0 + hn);  // textureUnit2 用 (ゆっくり広がる動き)
+  
   // 1つ目のエフェクト結果
-  vec4 t1_effect1 = texture2D(textureUnit, uv1);
-  vec4 t2_effect1 = texture2D(textureUnit1, uv2);
-  vec4 effect1 = mix(t1_effect1, t2_effect1, modProgress);
-
+  vec4 t_effect1 = texture2D(textureUnit, uv);
+  vec4 t1_effect1 = texture2D(textureUnit1, uv1);
+  vec4 t2_effect1 = texture2D(textureUnit2, uv2); 
+  // 3つのテクスチャを順にミックス
+  vec4 effect1 = mix(
+    mix(
+      t_effect1,
+      t1_effect1,
+      modProgress
+      ),
+      t2_effect1,
+      modProgress
+    );
+    
   // 2つ目のエフェクトの入力として、1つ目のエフェクト結果を使用
-  vec2 uvDivided = fract(newUV * vec2(50.0, 1.0));
+  vec2 uvDivided = fract(newUV * vec2(300.0, 1.0));
   
   // 2つ目のエフェクトで intensity を適用
   vec2 uvDisplaced1 = newUV + rotate(3.1415926 / 4.0) * uvDivided * modProgress * 0.1 * intensity;
   vec2 uvDisplaced2 = newUV + rotate(3.1415926 / 4.0) * uvDivided * (1.0 - modProgress) * 0.1 * intensity;
-
+  
   // 2つ目のエフェクトで、1つ目の結果を基に処理
-  vec4 t1_effect2 = texture2D(textureUnit, uvDisplaced1);
-  vec4 t2_effect2 = texture2D(textureUnit1, uvDisplaced2);
-
-  vec4 effect2 =  mix(t1_effect2, t2_effect2, modProgress);
+  vec4 t_effect2 = texture2D(textureUnit, uvDisplaced1);
+  vec4 t1_effect2 = texture2D(textureUnit1, uvDisplaced2);
+  vec4 t2_effect2 = texture2D(textureUnit2, uvDisplaced1); // 新たに追加
+  
+  // 3つのテクスチャを順にミックス
+  vec4 effect2 = mix(mix(t_effect2, t1_effect2, modProgress), t2_effect2, modProgress);
 
   // 最終結果をミックスし、順番に実行
-  vec4 finalEffect = mix(effect1, mix(t1_effect2, t2_effect2, modProgress), modProgress);
+  vec4 finalEffect = mix(effect1, mix(t_effect2, t1_effect2, modProgress), modProgress);
 
   gl_FragColor = finalEffect;
 }
