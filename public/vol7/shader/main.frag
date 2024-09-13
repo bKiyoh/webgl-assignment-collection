@@ -22,6 +22,7 @@ float random() {
     return fract(sin(2.0 + dot(gl_FragCoord.xy / resolution.xy / 10.0, vec2(12.9898, 4.1414))) * 43758.5453);
 }
 
+// ハッシュ関数
 float hash(float n) { 
     return fract(sin(n) * 1e4); 
 }
@@ -30,6 +31,7 @@ float hash(vec2 p) {
     return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); 
 }
 
+// ハッシュベースのノイズ生成
 float hnoise(vec2 x) {
   vec2 i = floor(x);
   vec2 f = fract(x);
@@ -45,48 +47,49 @@ void main() {
   vec2 newUV = vTexCoord;
 
   // 1つ目のエフェクト
+  // 参考: https://github.com/akella/webGLImageTransitions/blob/master/js/demo5.js
   float hn = hnoise(newUV.xy * resolution.xy / 100.0);
-  vec2 d = vec2(0., normalize(vec2(0.5, 0.5) - newUV.xy).y);
+  
+  // UV座標に基づいてノイズを適用
+  vec2 d = vec2(0., normalize(vec2(0.5, 0.5) - newUV.xy).y); 
 
   // `mod(progress, 1.0)` を使って `progress` をループさせる
-  float modProgress = mod(progress, 1.0);
+  float modProgress = progress;
 
+  // UV座標をノイズで歪ませる
   vec2 uv = newUV + d * modProgress / 5.0 * (1.0 + hn / 2.0);
   vec2 uv1 = newUV - d * (1.0 - modProgress) / 5.0 * (1.0 + hn / 2.0);
-  vec2 uv2 = newUV + d * modProgress / 10.0 * (1.0 + hn);  // textureUnit2 用 (ゆっくり広がる動き)
-  
+  vec2 uv2 = newUV + d * modProgress / 10.0 * (1.0 + hn);
+
   // 1つ目のエフェクト結果
   vec4 t_effect1 = texture2D(textureUnit, uv);
   vec4 t1_effect1 = texture2D(textureUnit1, uv1);
   vec4 t2_effect1 = texture2D(textureUnit2, uv2); 
-  // 3つのテクスチャを順にミックス
-  vec4 effect1 = mix(
-    mix(
-      t_effect1,
-      t1_effect1,
-      modProgress
-      ),
-      t2_effect1,
-      modProgress
-    );
-    
-  // 2つ目のエフェクトの入力として、1つ目のエフェクト結果を使用
+  
+  // 各テクスチャのミックス処理
+  vec4 intermediateEffect1 =  mix(t_effect1, t1_effect1, modProgress);
+  vec4 effect1 = mix(intermediateEffect1, t2_effect1, modProgress);
+
+  // ２つ目のエフェクト
+  // 参考: https://tympanus.net/codrops/2019/11/05/creative-webgl-image-transitions/
   vec2 uvDivided = fract(newUV * vec2(300.0, 1.0));
-  
-  // 2つ目のエフェクトで intensity を適用
-  vec2 uvDisplaced1 = newUV + rotate(3.1415926 / 4.0) * uvDivided * modProgress * 0.1 * intensity;
-  vec2 uvDisplaced2 = newUV + rotate(3.1415926 / 4.0) * uvDivided * (1.0 - modProgress) * 0.1 * intensity;
-  
-  // 2つ目のエフェクトで、1つ目の結果を基に処理
+
+  // 回転行列を適用し、UV座標をずらす
+  vec2 uvDisplaced1 = newUV + rotate(PI / 4.0) * uvDivided * modProgress * 0.1 * intensity;
+  vec2 uvDisplaced2 = newUV + rotate(PI / 4.0) * uvDivided * (1.0 - modProgress) * 0.1 * intensity;
+
+  // 2つ目のエフェクト結果
   vec4 t_effect2 = texture2D(textureUnit, uvDisplaced1);
   vec4 t1_effect2 = texture2D(textureUnit1, uvDisplaced2);
   vec4 t2_effect2 = texture2D(textureUnit2, uvDisplaced1); // 新たに追加
   
-  // 3つのテクスチャを順にミックス
-  vec4 effect2 = mix(mix(t_effect2, t1_effect2, modProgress), t2_effect2, modProgress);
+  // 3つのテクスチャを順にミックスする
+  float progressStep = modProgress * 2.0;
+  vec4 intermediateEffect2 = mix(t_effect2, t1_effect2, clamp(progressStep, 0.0, 1.0));
+  vec4 effect2 = mix(intermediateEffect2, t2_effect2, clamp(progressStep - 1.0, 0.0, 1.0));
 
-  // 最終結果をミックスし、順番に実行
-  vec4 finalEffect = mix(effect1, mix(t_effect2, t1_effect2, modProgress), modProgress);
+  // 最終的に1つ目と2つ目のエフェクトをミックス
+  vec4 finalEffect = mix(effect1, effect2, modProgress);
 
   gl_FragColor = finalEffect;
 }
