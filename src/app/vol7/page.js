@@ -237,8 +237,6 @@ class App {
 
     // ブレンドの設定
     gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
-    // その他の設定例（加算合成＋アルファで透明）
-    // gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE);
   }
 
   /**
@@ -317,7 +315,6 @@ class App {
     // プログラムオブジェクトを選択し uniform 変数を更新する
     gl.useProgram(this.program);
 
-    // <a href="https://unsplash.com/ja/%E5%86%99%E7%9C%9F/%E6%90%BA%E5%B8%AF%E9%9B%BB%E8%A9%B1%E3%82%92%E6%8C%81%E3%81%A3%E3%81%A6%E3%81%84%E3%82%8B%E4%BA%BA%E3%81%AE%E3%81%BC%E3%82%84%E3%81%91%E3%81%9F%E5%86%99%E7%9C%9F-zhbExGmC3jE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a>の<a href="https://unsplash.com/ja/@ikhlasrahman?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Ikhlas R.</a>が撮影した写真
     // 汎用的な uniform 変数は先にまとめて設定しておく
     const slowFactor = 3.0; // ここでスピードを調整するためのスケーリング値
     const progressValue = (Math.sin(nowTime / slowFactor) + 1.0) / 2.0;

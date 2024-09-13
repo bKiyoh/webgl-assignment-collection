@@ -53,13 +53,10 @@ void main() {
   // UV座標に基づいてノイズを適用
   vec2 d = vec2(0., normalize(vec2(0.5, 0.5) - newUV.xy).y); 
 
-  // `mod(progress, 1.0)` を使って `progress` をループさせる
-  float modProgress = progress;
-
   // UV座標をノイズで歪ませる
-  vec2 uv = newUV + d * modProgress / 5.0 * (1.0 + hn / 2.0);
-  vec2 uv1 = newUV - d * (1.0 - modProgress) / 5.0 * (1.0 + hn / 2.0);
-  vec2 uv2 = newUV + d * modProgress / 10.0 * (1.0 + hn);
+  vec2 uv = newUV + d *  progress / 5.0 * (1.0 + hn / 2.0);
+  vec2 uv1 = newUV - d * (1.0 -  progress) / 5.0 * (1.0 + hn / 2.0);
+  vec2 uv2 = newUV + d *  progress / 10.0 * (1.0 + hn);
 
   // 1つ目のエフェクト結果
   vec4 t_effect1 = texture2D(textureUnit, uv);
@@ -67,16 +64,16 @@ void main() {
   vec4 t2_effect1 = texture2D(textureUnit2, uv2); 
   
   // 各テクスチャのミックス処理
-  vec4 intermediateEffect1 =  mix(t_effect1, t1_effect1, modProgress);
-  vec4 effect1 = mix(intermediateEffect1, t2_effect1, modProgress);
+  vec4 intermediateEffect1 =  mix(t_effect1, t1_effect1,  progress);
+  vec4 effect1 = mix(intermediateEffect1, t2_effect1,  progress);
 
   // ２つ目のエフェクト
   // 参考: https://tympanus.net/codrops/2019/11/05/creative-webgl-image-transitions/
   vec2 uvDivided = fract(newUV * vec2(300.0, 1.0));
 
   // 回転行列を適用し、UV座標をずらす
-  vec2 uvDisplaced1 = newUV + rotate(PI / 4.0) * uvDivided * modProgress * 0.1 * intensity;
-  vec2 uvDisplaced2 = newUV + rotate(PI / 4.0) * uvDivided * (1.0 - modProgress) * 0.1 * intensity;
+  vec2 uvDisplaced1 = newUV + rotate(PI / 4.0) * uvDivided *  progress * 0.1 * intensity;
+  vec2 uvDisplaced2 = newUV + rotate(PI / 4.0) * uvDivided * (1.0 -  progress) * 0.1 * intensity;
 
   // 2つ目のエフェクト結果
   vec4 t_effect2 = texture2D(textureUnit, uvDisplaced1);
@@ -84,12 +81,12 @@ void main() {
   vec4 t2_effect2 = texture2D(textureUnit2, uvDisplaced1); // 新たに追加
   
   // 3つのテクスチャを順にミックスする
-  float progressStep = modProgress * 2.0;
+  float progressStep =  progress * 2.0;
   vec4 intermediateEffect2 = mix(t_effect2, t1_effect2, clamp(progressStep, 0.0, 1.0));
   vec4 effect2 = mix(intermediateEffect2, t2_effect2, clamp(progressStep - 1.0, 0.0, 1.0));
 
   // 最終的に1つ目と2つ目のエフェクトをミックス
-  vec4 finalEffect = mix(effect1, effect2, modProgress);
+  vec4 finalEffect = mix(effect1, effect2,  progress);
 
   gl_FragColor = finalEffect;
 }
