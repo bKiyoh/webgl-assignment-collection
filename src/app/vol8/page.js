@@ -48,20 +48,31 @@ class App {
   height;
   canvas; // WebGL で描画を行う canvas 要素
   gl; // WebGLRenderingContext （WebGL コンテキスト）
-  program; // WebGLProgram （プログラムオブジェクト）
-  attributeLocation; // attribute 変数のロケーション
-  attributeStride; // attribute 変数のストライド
-  uniformLocation; // uniform 変数のロケーション
+  renderProgram; // 最終シーン用プログラムオブジェクト
+  renderAttLocation; // 最終シーン用の attribute 変数のロケーション
+  renderAttStride; // 最終シーン用の attribute 変数のストライド
+  renderUniLocation; // 最終シーン用の uniform 変数のロケーション
+  offscreenProgram; // オフスクリーン用のプログラムオブジェクト
+  offscreenAttLocation; // オフスクリーン用の attribute 変数のロケーション
+  offscreenAttStride; // オフスクリーン用の attribute 変数のストライド
+  offscreenUniLocation; // オフスクリーン用の uniform 変数のロケーション
   planeGeometry; // 板ポリゴンのジオメトリ情報
   planeVBO; // 板ポリゴンの頂点バッファ
   planeIBO; // 板ポリゴンのインデックスバッファ
+  sphereGeometry; // 球体のジオメトリ情報
+  sphereVBO; // 球体の頂点バッファ
+  sphereIBO; // 球体のインデックスバッファ
   startTime; // レンダリング開始時のタイムスタンプ
   camera; // WebGLOrbitCamera のインスタンス
   isRendering; // レンダリングを行うかどうかのフラグ
-  texture; // テクスチャのインスタンス
-  textureVisibility; // テクスチャの可視性
-  isBlending; // ブレンディングを行うかどうかのフラグ @@@
-  globalAlpha; // グローバルなアルファ値 @@@
+  framebufferObject; // フレームバッファに関連するオブジェクト
+  texture; // テクスチャ
+  textureVisibility; // テクスチャの表示・非表示フラグ
+  globalAlpha; // グローバルアルファ値
+  mousePosition; // マウス座標を保持する変数
+  isTypeOne; // ノイズ生成のロジック１を使うかどうかのフラグ @@@
+  timeSpeed; // 時間の経過速度係数 @@@
+  alpha; // ノイズに適用するアルファ値 @@@
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -69,36 +80,8 @@ class App {
     this.height = height - App.RENDERER_PARAM.rendererRatio;
     this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
-  }
-
-  /**
-   * ブレンディングを設定する @@@
-   * @param {boolean} flag - 設定する値
-   */
-  setBlending(flag) {
-    const gl = this.gl;
-    if (flag === true) {
-      gl.enable(gl.BLEND);
-    } else {
-      gl.disable(gl.BLEND);
-    }
-  }
-
-  /**
-   * テクスチャのフィルタを設定する @@@
-   * ※現在バインドされているアクティブなテクスチャが更新される点に注意
-   * @param {number} filter - 設定する値
-   */
-  setTextureFilter(filter) {
-    const gl = this.gl;
-    // 縮小フィルタは常に指定どおり
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
-    // 拡大フィルタはミップマップ系は使えない
-    if (filter === gl.NEAREST) {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    } else {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    }
+    // マウスイベントのハンドラをバインド
+    this.onMouseMove = this.onMouseMove.bind(this);
   }
 
   /**
@@ -125,17 +108,42 @@ class App {
     // リサイズイベントの設定
     window.addEventListener("resize", this.resize, false);
 
-    // 深度テストは初期状態で有効
+    // マウスイベントの設定
+    this.canvas.addEventListener("mousemove", this.onMouseMove, false);
+
+    // バックフェイスカリングと深度テストは初期状態で有効
+    this.gl.enable(this.gl.CULL_FACE);
     this.gl.enable(this.gl.DEPTH_TEST);
 
     // 初期状態ではテクスチャが見えているようにする
     this.textureVisibility = true;
 
-    // 初期状態ではブレンディングは無効化 @@@
-    this.isBlending = false;
-
-    // 初期状態ではアルファ値は完全な不透明となるよう設定する @@@
+    // 初期状態ではアルファ値は完全な不透明となるよう設定する
     this.globalAlpha = 1.0;
+
+    // マウス位置の初期化（キャンバス中央）
+    this.mousePosition = {
+      x: this.canvas.width / 2,
+      y: this.canvas.height / 2,
+    };
+
+    // 初期状態ではノイズの生成はロジック１を使う @@@
+    this.isTypeOne = true;
+
+    // 初期状態では時間の経過は 1.0 倍（早くも遅くもしない） @@@
+    this.timeSpeed = 1.0;
+
+    // 初期状態ではノイズのアルファは 0.5 で半透明 @@@
+    this.alpha = 0.5;
+  }
+
+  /**
+   * マウス移動時のイベントハンドラ
+   */
+  onMouseMove(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mousePosition.x = event.clientX - rect.left;
+    this.mousePosition.y = this.canvas.height - (event.clientY - rect.top); // Y座標を反転
   }
 
   /**
@@ -147,19 +155,13 @@ class App {
     const pane = new Pane();
     const parameter = {
       texture: this.textureVisibility,
-      blending: this.isBlending,
       alpha: this.globalAlpha,
     };
     // テクスチャの表示・非表示
     pane.addBinding(parameter, "texture").on("change", (v) => {
       this.textureVisibility = v.value;
     });
-    // ブレンドを行うかどうか @@@
-    pane.addBinding(parameter, "blending").on("change", (v) => {
-      this.isBlending = v.value;
-      this.setBlending(v.value);
-    });
-    // グローバルなアルファ値 @@@
+    // グローバルなアルファ値
     pane
       .addBinding(parameter, "alpha", {
         min: 0.0,
@@ -187,8 +189,28 @@ class App {
    * リサイズ処理
    */
   resize() {
+    const gl = this.gl;
     this.canvas.width = this.width;
     this.canvas.height = this.height;
+
+    // フレームバッファもリサイズ処理の対象とする
+    if (this.framebufferObject == null) {
+      // まだ生成されていない場合は、生成する
+      this.framebufferObject = WebGLUtility.createFramebuffer(
+        gl,
+        this.canvas.width,
+        this.canvas.height
+      );
+    } else {
+      // 生成済みのフレームバッファもキャンバスにサイズを合わせる
+      WebGLUtility.resizeFramebuffer(
+        this.gl,
+        this.canvas.width,
+        this.canvas.height,
+        this.framebufferObject.depthRenderbuffer,
+        this.framebufferObject.texture
+      );
+    }
   }
 
   /**
@@ -205,29 +227,56 @@ class App {
         const error = new Error("not initialized");
         reject(error);
       } else {
-        // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol8/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol8/shader/main.frag");
-        // 無事に読み込めたらシェーダオブジェクトの実体を生成する
-        const vertexShader = WebGLUtility.createShaderObject(
+        // 最終シーン用のシェーダ @@@
+        const renderVSSource = await WebGLUtility.loadFile(
+          "/vol8/shader/render.vert"
+        );
+        const renderFSSource = await WebGLUtility.loadFile(
+          "/vol8/shader/render.frag"
+        );
+        const renderVertexShader = WebGLUtility.createShaderObject(
           gl,
-          VSSource,
+          renderVSSource,
           gl.VERTEX_SHADER
         );
-        const fragmentShader = WebGLUtility.createShaderObject(
+        const renderFragmentShader = WebGLUtility.createShaderObject(
           gl,
-          FSSource,
+          renderFSSource,
           gl.FRAGMENT_SHADER
         );
-        this.program = WebGLUtility.createProgramObject(
+        this.renderProgram = WebGLUtility.createProgramObject(
           gl,
-          vertexShader,
-          fragmentShader
+          renderVertexShader,
+          renderFragmentShader
         );
+
+        // オフスクリーン用のシェーダ @@@
+        const offscreenVSSource = await WebGLUtility.loadFile(
+          "/vol8/shader/offscreen.vert"
+        );
+        const offscreenFSSource = await WebGLUtility.loadFile(
+          "/vol8/shader/offscreen.frag"
+        );
+        const offscreenVertexShader = WebGLUtility.createShaderObject(
+          gl,
+          offscreenVSSource,
+          gl.VERTEX_SHADER
+        );
+        const offscreenFragmentShader = WebGLUtility.createShaderObject(
+          gl,
+          offscreenFSSource,
+          gl.FRAGMENT_SHADER
+        );
+        this.offscreenProgram = WebGLUtility.createProgramObject(
+          gl,
+          offscreenVertexShader,
+          offscreenFragmentShader
+        );
+
         // 画像を読み込み、テクスチャを初期化する
         const image = await WebGLUtility.loadImage("/vol8/sample.jpg");
         this.texture = WebGLUtility.createTexture(gl, image);
-        // Promsie を解決
+
         resolve();
       }
     });
@@ -237,19 +286,27 @@ class App {
    * 頂点属性（頂点ジオメトリ）のセットアップを行う
    */
   setupGeometry() {
-    // プレーンジオメトリの情報を取得
-    const size = 2.0;
     const color = [1.0, 1.0, 1.0, 1.0];
-    this.planeGeometry = WebGLGeometry.plane(size, size, color);
-
-    // VBO と IBO を生成する
+    const size = 2.0;
+    // plane は this.renderProgram と一緒に使う
+    const planeSize = 2.0;
+    this.planeGeometry = WebGLGeometry.plane(planeSize, planeSize, color);
     this.planeVBO = [
+      WebGLUtility.createVBO(this.gl, this.planeGeometry.position),
+      WebGLUtility.createVBO(this.gl, this.planeGeometry.texCoord),
+    ];
+    this.planeIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
+
+    // プレーンジオメトリの情報を取得
+    this.sphereGeometry = WebGLGeometry.plane(size, size, color);
+    // VBO と IBO を生成する
+    this.sphereVBO = [
       WebGLUtility.createVBO(this.gl, this.planeGeometry.position),
       WebGLUtility.createVBO(this.gl, this.planeGeometry.normal),
       WebGLUtility.createVBO(this.gl, this.planeGeometry.color),
       WebGLUtility.createVBO(this.gl, this.planeGeometry.texCoord),
     ];
-    this.planeIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
+    this.sphereIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
   }
 
   /**
@@ -257,22 +314,43 @@ class App {
    */
   setupLocation() {
     const gl = this.gl;
+    // レンダリング用のセットアップ
+    this.renderAttLocation = [
+      gl.getAttribLocation(this.renderProgram, "position"),
+      gl.getAttribLocation(this.renderProgram, "texCoord"),
+    ];
+    this.renderAttStride = [3, 2];
+    this.renderUniLocation = {
+      textureUnit: gl.getUniformLocation(this.renderProgram, "textureUnit"), // テクスチャユニット
+      useTypeOne: gl.getUniformLocation(this.renderProgram, "useTypeOne"), // ノイズの種類 @@@
+      time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過 @@@
+      alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ @@@
+    };
+
     // attribute location の取得
-    this.attributeLocation = [
-      gl.getAttribLocation(this.program, "position"),
-      gl.getAttribLocation(this.program, "normal"),
-      gl.getAttribLocation(this.program, "color"),
-      gl.getAttribLocation(this.program, "texCoord"),
+    this.offscreenAttLocation = [
+      gl.getAttribLocation(this.offscreenProgram, "position"),
+      gl.getAttribLocation(this.offscreenProgram, "normal"),
+      gl.getAttribLocation(this.offscreenProgram, "color"),
+      gl.getAttribLocation(this.offscreenProgram, "texCoord"),
     ];
     // attribute のストライド
-    this.attributeStride = [3, 3, 4, 2];
+    this.offscreenAttStride = [3, 3, 4, 2];
     // uniform location の取得
-    this.uniformLocation = {
-      mvpMatrix: gl.getUniformLocation(this.program, "mvpMatrix"),
-      normalMatrix: gl.getUniformLocation(this.program, "normalMatrix"),
-      textureUnit: gl.getUniformLocation(this.program, "textureUnit"),
-      useTexture: gl.getUniformLocation(this.program, "useTexture"), // テクスチャを使うかどうかのフラグ @@@
-      globalAlpha: gl.getUniformLocation(this.program, "globalAlpha"), // グローバルアルファ @@@
+    this.offscreenUniLocation = {
+      mvpMatrix: gl.getUniformLocation(this.offscreenProgram, "mvpMatrix"),
+      normalMatrix: gl.getUniformLocation(
+        this.offscreenProgram,
+        "normalMatrix"
+      ),
+      textureUnit: gl.getUniformLocation(this.offscreenProgram, "textureUnit"),
+      useTexture: gl.getUniformLocation(this.offscreenProgram, "useTexture"),
+      globalAlpha: gl.getUniformLocation(this.offscreenProgram, "globalAlpha"),
+      mousePosition: gl.getUniformLocation(
+        this.offscreenProgram,
+        "mousePosition"
+      ), // マウス座標
+      resolution: gl.getUniformLocation(this.offscreenProgram, "resolution"), // 画面サイズ
     };
   }
 
@@ -281,6 +359,8 @@ class App {
    */
   setupRendering() {
     const gl = this.gl;
+    // フレームバッファのバインドを解除する
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // クリアする色と深度を設定する
@@ -288,11 +368,32 @@ class App {
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // プログラムオブジェクトを選択
+    gl.useProgram(this.renderProgram);
+    // フレームバッファにアタッチされているテクスチャをバインドする
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.framebufferObject.texture);
+  }
 
-    // ブレンドの設定 @@@
-    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
-    // その他の設定例（加算合成＋アルファで透明）
-    // gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE);
+  /**
+   * オフスクリーンレンダリングのためのセットアップを行う
+   */
+  setupOffscreenRendering() {
+    const gl = this.gl;
+    // フレームバッファをバインドして描画の対象とする
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebufferObject.framebuffer);
+    // ビューポートを設定する
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    // クリアする色と深度を設定する
+    gl.clearColor(1.0, 0.6, 0.9, 1.0);
+    gl.clearDepth(1.0);
+    // 色と深度をクリアする
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // プログラムオブジェクトを選択
+    gl.useProgram(this.offscreenProgram);
+    // 第1パスで生成したテクスチャをバインド
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
   }
 
   /**
@@ -300,7 +401,7 @@ class App {
    */
   start() {
     const gl = this.gl;
-    // 途中でテクスチャを切り替えないためここでバインドしておく @@@
+    // テクスチャをバインド
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     // レンダリング開始時のタイムスタンプを取得しておく
@@ -329,49 +430,92 @@ class App {
     }
     // 現在までの経過時間
     const nowTime = (Date.now() - this.startTime) * 0.001;
-    // レンダリングのセットアップ
-    this.setupRendering();
-    // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
-    const m = Mat4.identity();
-    // ビュー・プロジェクション座標変換行列
-    const v = this.camera.update();
-    const fovy = 45;
-    const aspect = window.innerWidth / window.innerHeight;
-    const near = 0.1;
-    const far = 10.0;
-    const p = Mat4.perspective(fovy, aspect, near, far);
-    // 行列を乗算して MVP 行列を生成する（掛ける順序に注意）
-    const vp = Mat4.multiply(p, v);
 
-    // VBO と IBO を設定し、描画する
-    WebGLUtility.enableBuffer(
-      gl,
-      this.planeVBO,
-      this.attributeLocation,
-      this.attributeStride,
-      this.planeIBO
-    );
-
-    // プログラムオブジェクトを選択し uniform 変数を更新する
-    gl.useProgram(this.program);
-
-    // 汎用的な uniform 変数は先にまとめて設定しておく
-    gl.uniform1i(this.uniformLocation.textureUnit, 0);
-    gl.uniform1i(this.uniformLocation.useTexture, this.textureVisibility);
-    gl.uniform1f(this.uniformLocation.globalAlpha, this.globalAlpha); // グローバルアルファ @@@
-
-    // １つ目のポリゴンを描画する @@@
+    // - オフスクリーンレンダリング -------------------------------------------
     {
-      // モデル座標変換行列（１つ目は奥）
-      const m = Mat4.translate(Mat4.identity(), Vec3.create(0.0, 0.0, 0.0));
+      // レンダリングのセットアップ
+      this.setupOffscreenRendering();
+      // オフスクリーンシーン用のビュー行列を作る
+      const v = this.camera.update();
+      // オフスクリーンシーン用のプロジェクション行列を作る
+      const fovy = 45;
+      const aspect = window.innerWidth / window.innerHeight;
+      const near = 0.1;
+      const far = 10.0;
+      const p = Mat4.perspective(fovy, aspect, near, far);
+      // オフスクリーン用のビュー・プロジェクション行列
+      const vp = Mat4.multiply(p, v);
+      // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
+      const m = Mat4.identity();
+      // オフスクリーン用の MVP 行列
       const mvp = Mat4.multiply(vp, m);
+      // オフスクリーン用の法線変換行列
       const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-      gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, mvp);
+      // VBO と IBO
+      WebGLUtility.enableBuffer(
+        gl,
+        this.sphereVBO,
+        this.offscreenAttLocation,
+        this.offscreenAttStride,
+        this.sphereIBO
+      );
+      gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
       gl.uniformMatrix4fv(
-        this.uniformLocation.normalMatrix,
+        this.offscreenUniLocation.normalMatrix,
         false,
         normalMatrix
       );
+      gl.uniform3fv(
+        this.offscreenUniLocation.lightVector,
+        Vec3.create(1.0, 1.0, 1.0)
+      );
+      gl.uniform1i(this.offscreenUniLocation.textureUnit, 0);
+      gl.uniform1i(
+        this.offscreenUniLocation.useTexture,
+        this.textureVisibility
+      );
+      gl.uniform1f(this.offscreenUniLocation.globalAlpha, this.globalAlpha);
+      // マウス座標をシェーダーに渡す
+      gl.uniform2f(
+        this.offscreenUniLocation.mousePosition,
+        this.mousePosition.x,
+        this.mousePosition.y
+      );
+      // 画面サイズをシェーダーに渡す
+      gl.uniform2f(
+        this.offscreenUniLocation.resolution,
+        this.canvas.width,
+        this.canvas.height
+      );
+      // 描画
+      gl.drawElements(
+        gl.TRIANGLES,
+        this.sphereGeometry.index.length,
+        gl.UNSIGNED_SHORT,
+        0
+      );
+    }
+    // ------------------------------------------------------------------------
+
+    // - 最終シーンのレンダリング ---------------------------------------------
+    {
+      // レンダリングのセットアップ
+      this.setupRendering();
+
+      // VBO と IBO
+      WebGLUtility.enableBuffer(
+        gl,
+        this.planeVBO,
+        this.renderAttLocation,
+        this.renderAttStride,
+        this.planeIBO
+      );
+      // シェーダに各種パラメータを送る
+      gl.uniform1i(this.renderUniLocation.textureUnit, 0);
+      gl.uniform1i(this.renderUniLocation.useTypeOne, this.isTypeOne); // ノイズ生成ロジック１を使うかどうか @@@
+      gl.uniform1f(this.renderUniLocation.time, this.timeSpeed * nowTime); // 時間の経過 @@@
+      gl.uniform1f(this.renderUniLocation.alpha, this.alpha); // ノイズのアルファ @@@
+      // 描画
       gl.drawElements(
         gl.TRIANGLES,
         this.planeGeometry.index.length,
@@ -379,5 +523,6 @@ class App {
         0
       );
     }
+    // ------------------------------------------------------------------------
   }
 }
