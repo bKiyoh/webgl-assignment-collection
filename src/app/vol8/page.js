@@ -4,13 +4,11 @@ import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
-import { Pane } from "@/lib/webGl/tweakpane-4.0.3.min.js";
 
 export default function Page() {
   const initializedRef = useRef(false);
   const initAndLoad = async (app) => {
     app.init();
-    app.setupPane();
     await app.load();
     app.setupGeometry();
     app.setupLocation();
@@ -68,13 +66,13 @@ class App {
   framebufferObject; // フレームバッファに関連するオブジェクト
   texture; // テクスチャ
   textureVisibility; // テクスチャの表示・非表示フラグ
-  globalAlpha; // グローバルアルファ値
   mousePosition; // マウス座標を保持する変数
-  isTypeOne; // ノイズ生成のロジック１を使うかどうかのフラグ @@@
   timeSpeed; // 時間の経過速度係数 @@@
   alpha; // ノイズに適用するアルファ値 @@@
   noiseDistortion; // ノイズの歪み係数 @@@
-  noiseVisible; // ノイズの色を可視化するかどうかのフラグ @@@
+  cameraPosition;
+  cameraTarget;
+  upDirection;
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -120,17 +118,11 @@ class App {
     // 初期状態ではテクスチャが見えているようにする
     this.textureVisibility = false;
 
-    // 初期状態ではアルファ値は完全な不透明となるよう設定する
-    this.globalAlpha = 1.0;
-
     // マウス位置の初期化（キャンバス中央）
     this.mousePosition = {
-      x: this.canvas.width / 2,
-      y: this.canvas.height / 2,
+      x: -9999, // キャンバス外の座標
+      y: -9999,
     };
-
-    // 初期状態ではノイズの生成はロジック１を使う @@@
-    this.isTypeOne = true;
 
     // 初期状態では時間の経過は 1.0 倍（早くも遅くもしない） @@@
     this.timeSpeed = 1.0;
@@ -140,9 +132,6 @@ class App {
 
     // 初期状態ではわずかに歪ませる @@@
     this.noiseDistortion = 0.3;
-
-    // 初期状態ではノイズは不可視とする @@@
-    this.noiseVisible = false;
   }
 
   /**
@@ -152,61 +141,6 @@ class App {
     const rect = this.canvas.getBoundingClientRect();
     this.mousePosition.x = event.clientX - rect.left;
     this.mousePosition.y = this.canvas.height - (event.clientY - rect.top); // Y座標を反転
-  }
-
-  /**
-   * tweakpane の初期化処理
-   */
-  setupPane() {
-    const gl = this.gl;
-    // Tweakpane を使った GUI の設定
-    const pane = new Pane();
-    const parameter = {
-      texture: this.textureVisibility,
-      alpha: this.globalAlpha,
-      noiseDistortion: this.noiseDistortion,
-      noiseVisible: this.noiseVisible,
-    };
-    // テクスチャの表示・非表示
-    pane.addBinding(parameter, "texture").on("change", (v) => {
-      this.textureVisibility = v.value;
-    });
-    // グローバルなアルファ値
-    pane
-      .addBinding(parameter, "alpha", {
-        min: 0.0,
-        max: 1.0,
-      })
-      .on("change", (v) => {
-        this.globalAlpha = v.value;
-      });
-
-    // ノイズの歪み係数 @@@
-    pane
-      .addBinding(parameter, "noiseDistortion", {
-        min: 0.0,
-        max: 1.0,
-      })
-      .on("change", (v) => {
-        this.noiseDistortion = v.value;
-      });
-    // ノイズの可視化状態 @@@
-    pane.addBinding(parameter, "noiseVisible").on("change", (v) => {
-      this.noiseVisible = v.value;
-    });
-
-    // TweakpaneのDOM要素の取得
-    const paneElement = pane.element;
-    // スタイルの適用で位置を調整
-    paneElement.style.position = "absolute"; // 絶対位置に変更
-    paneElement.style.top = "55px"; // 上からの位置
-    paneElement.style.right = "55px"; // 右からの位置
-    // ラベルの幅を調整して二段にならないようにする
-    const labels = paneElement.querySelectorAll(".tp-lblv_l"); // Tweakpaneのラベル要素を取得
-    for (const label of labels) {
-      label.style.width = "auto"; // 幅を自動調整
-      label.style.whiteSpace = "nowrap"; // テキストの折り返しを防止
-    }
   }
 
   /**
@@ -296,11 +230,6 @@ class App {
           offscreenVertexShader,
           offscreenFragmentShader
         );
-
-        // 画像を読み込み、テクスチャを初期化する
-        const image = await WebGLUtility.loadImage("/vol8/sample.jpg");
-        this.texture = WebGLUtility.createTexture(gl, image);
-
         resolve();
       }
     });
@@ -358,7 +287,7 @@ class App {
       time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過 @@@
       alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ @@@
       mousePosition: gl.getUniformLocation(this.renderProgram, "mousePosition"), // マウス座標
-      noiseVisible: gl.getUniformLocation(this.renderProgram, "noiseVisible"), // ノイズの色を可視化するかどうか @@@
+      // ノイズの色を可視化するかどうか @@@
       noiseDistortion: gl.getUniformLocation(
         this.renderProgram,
         "noiseDistortion"
@@ -382,14 +311,8 @@ class App {
         "normalMatrix"
       ),
       textureUnit: gl.getUniformLocation(this.offscreenProgram, "textureUnit"),
-      useTexture: gl.getUniformLocation(this.offscreenProgram, "useTexture"),
-      globalAlpha: gl.getUniformLocation(this.offscreenProgram, "globalAlpha"),
       resolution: gl.getUniformLocation(this.offscreenProgram, "resolution"), // 画面サイズ
       time: gl.getUniformLocation(this.offscreenProgram, "time"), // 時間の経過 @@@
-      noiseVisible: gl.getUniformLocation(
-        this.offscreenProgram,
-        "noiseVisible"
-      ), // ノイズの色を可視化するかどうか @@@
       noiseDistortion: gl.getUniformLocation(
         this.offscreenProgram,
         "noiseDistortion"
@@ -501,26 +424,16 @@ class App {
         Vec3.create(1.0, 1.0, 1.0)
       );
       gl.uniform1i(this.offscreenUniLocation.textureUnit, 0);
-      gl.uniform1i(
-        this.offscreenUniLocation.useTexture,
-        this.textureVisibility
-      );
-      gl.uniform1f(this.offscreenUniLocation.globalAlpha, this.globalAlpha);
       gl.uniform2f(
         this.offscreenUniLocation.resolution,
         this.canvas.width,
         this.canvas.height
       );
       gl.uniform1f(this.offscreenUniLocation.time, this.timeSpeed * nowTime);
-      gl.uniform1i(
-        this.offscreenUniLocation.noiseVisible,
-        this.noiseVisible ? 1 : 0
-      );
       gl.uniform1f(
         this.offscreenUniLocation.noiseDistortion,
         this.noiseDistortion
       );
-
       // --- 第一の球体を描画 ---
       {
         let m = Mat4.identity();
@@ -618,6 +531,7 @@ class App {
           0
         );
       }
+
       // --- 第五の球体を描画 ---
       {
         let m = Mat4.identity();
@@ -668,7 +582,7 @@ class App {
         );
       }
 
-      // --- 第六の球体を描画 ---
+      // --- 第七の球体を描画 ---
       {
         let m = Mat4.identity();
         const x = 3.5;
@@ -721,10 +635,6 @@ class App {
       gl.uniform1f(
         this.renderUniLocation.noiseDistortion,
         this.noiseDistortion
-      );
-      gl.uniform1i(
-        this.renderUniLocation.noiseVisible,
-        this.noiseVisible ? 1 : 0
       );
       // 平面を描画
       gl.drawElements(

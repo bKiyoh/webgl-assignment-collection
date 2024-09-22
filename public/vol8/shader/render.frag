@@ -1,10 +1,12 @@
 precision mediump float;
 
 uniform sampler2D textureUnit;
-uniform bool noiseVisible; // ノイズの色を可視化するかどうか @@@
-uniform float noiseDistortion; // ノイズの歪み係数値 @@@
-uniform vec2 resolution; // スクリーンの解像度
+uniform float noiseDistortion;    // ノイズの歪み係数値
+uniform vec2 resolution;          // スクリーンの解像度
 uniform float time;
+uniform vec2 mousePosition;       // マウス座標
+uniform float alpha;              // マウス周辺でのノイズ強度を調整するための係数
+
 varying vec2 vTexCoord;
 
 const float INVERSE3 = 1.0 / 3.0;
@@ -18,7 +20,7 @@ float interpolate(float a, float b, float x){
     return a * (1.0 - f) + b * f;
 }
 
-// 乱数生成器（その２）
+// 乱数生成器
 float rnd(vec2 n){
   float a  = 0.129898;
   float b  = 0.78233;
@@ -38,6 +40,7 @@ float irnd(vec2 p){
                 rnd(vec2(i.x + 1.0, i.y + 1.0)));
   return interpolate(interpolate(v.x, v.y, f.x), interpolate(v.z, v.w, f.x), f.y);
 }
+
 // ノイズ
 float noise(vec2 p){
   float t = 0.0;
@@ -48,6 +51,7 @@ float noise(vec2 p){
   }
   return t;
 }
+
 // シームレスノイズ
 float snoise(vec2 p, vec2 q, vec2 r){
   return noise(vec2(p.x,       p.y      )) *        q.x  *        q.y  +
@@ -66,9 +70,28 @@ void main() {
   // ノイズの歪み係数を乗算する
   n *= noiseDistortion;
 
+  // マウス位置に基づく追加のノイズ効果を計算
+  vec2 fragCoord = gl_FragCoord.xy;
+  float dist = length(fragCoord - mousePosition);
+
+  // ノイズを強調する半径を定義
+  float radius = 250.0; // ノイズを強調する範囲（ピクセル単位）
+
+  // 距離に基づいてマスクを計算（ノイズの強度を増幅）
+  float mask = 1.0 - smoothstep(0.0, radius, dist);
+
+  // マウス周辺でのノイズ強度を調整
+  float mouseEffect = 1.0 * mask * alpha;
+
+  // 全体のノイズとマウス効果を合成
+  float totalNoise = n + mouseEffect;
+
   // テクスチャ座標を一度 -1.0 ～ 1.0 にして歪み係数を加算し、元に戻す
-  vec2 coord = (vTexCoord * 2.0 - 1.0) + n;
+  vec2 coord = (vTexCoord * 2.0 - 1.0) + totalNoise;
   coord = coord * 0.5 + 0.5;
+
+  // テクスチャ座標をクランプ（範囲外アクセス防止）
+  coord = clamp(coord, 0.0, 1.0);
 
   // 歪み係数を反映したテクスチャ座標でテクスチャの色をサンプリング
   vec4 samplerColor = texture2D(textureUnit, coord);

@@ -1,12 +1,9 @@
 precision mediump float;
 
 uniform sampler2D textureUnit;
-uniform bool useTexture;
-uniform float globalAlpha; // グローバルアルファ @@@
 uniform vec2 mousePosition; // マウス座標を追加
 uniform vec2 resolution;    // 画面サイズを追加
 uniform float time;
-uniform bool noiseVisible; // ノイズの色を可視化するかどうか @@@
 uniform float noiseDistortion; // ノイズの歪み係数値 @@@
 
 varying vec4 vColor;
@@ -81,9 +78,9 @@ void main() {
   // グレースケールの値をノイズに基づいて計算（0.8から1.0の範囲で限定）
   float grayScaleValue = 0.8 + s * 0.2;
 
-  // useTexture が false の場合はグレーの色を使用し、雲に近い色にする
-  vec4 outColor = useTexture ? textureColor : vec4(vec3(grayScaleValue), 1.0);
+  //グレーの色を使用し、雲に近い色にする
+  vec4 outColor = vec4(vec3(grayScaleValue), 1.0);
 
-  gl_FragColor =  outColor * vec4(vec3(1.0), globalAlpha);
+  gl_FragColor =  outColor * vec4(vec3(1.0), 1.0);
 
 }
