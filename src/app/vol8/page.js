@@ -33,7 +33,7 @@ export default function Page() {
       }
     };
   }, []);
-  return <canvas id="webgl-canvas" style={{ cursor: "none" }} />;
+  return <canvas id="webgl-canvas" />;
 }
 
 /**
@@ -73,6 +73,8 @@ class App {
   isTypeOne; // ノイズ生成のロジック１を使うかどうかのフラグ @@@
   timeSpeed; // 時間の経過速度係数 @@@
   alpha; // ノイズに適用するアルファ値 @@@
+  noiseDistortion; // ノイズの歪み係数 @@@
+  noiseVisible; // ノイズの色を可視化するかどうかのフラグ @@@
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -96,7 +98,7 @@ class App {
     // カメラ制御用インスタンスを生成する
     const cameraOption = {
       distance: 5.0, // Z 軸上の初期位置までの距離
-      min: 1.0, // カメラが寄れる最小距離
+      min: 0.1, // カメラが寄れる最小距離
       max: 10.0, // カメラが離れられる最大距離
       move: 2.0, // 右ボタンで平行移動する際の速度係数
     };
@@ -116,7 +118,7 @@ class App {
     this.gl.enable(this.gl.DEPTH_TEST);
 
     // 初期状態ではテクスチャが見えているようにする
-    this.textureVisibility = true;
+    this.textureVisibility = false;
 
     // 初期状態ではアルファ値は完全な不透明となるよう設定する
     this.globalAlpha = 1.0;
@@ -135,6 +137,12 @@ class App {
 
     // 初期状態ではノイズのアルファは 0.5 で半透明 @@@
     this.alpha = 0.5;
+
+    // 初期状態ではわずかに歪ませる @@@
+    this.noiseDistortion = 0.3;
+
+    // 初期状態ではノイズは不可視とする @@@
+    this.noiseVisible = false;
   }
 
   /**
@@ -156,6 +164,8 @@ class App {
     const parameter = {
       texture: this.textureVisibility,
       alpha: this.globalAlpha,
+      noiseDistortion: this.noiseDistortion,
+      noiseVisible: this.noiseVisible,
     };
     // テクスチャの表示・非表示
     pane.addBinding(parameter, "texture").on("change", (v) => {
@@ -170,6 +180,20 @@ class App {
       .on("change", (v) => {
         this.globalAlpha = v.value;
       });
+
+    // ノイズの歪み係数 @@@
+    pane
+      .addBinding(parameter, "noiseDistortion", {
+        min: 0.0,
+        max: 1.0,
+      })
+      .on("change", (v) => {
+        this.noiseDistortion = v.value;
+      });
+    // ノイズの可視化状態 @@@
+    pane.addBinding(parameter, "noiseVisible").on("change", (v) => {
+      this.noiseVisible = v.value;
+    });
 
     // TweakpaneのDOM要素の取得
     const paneElement = pane.element;
@@ -297,16 +321,24 @@ class App {
     ];
     this.planeIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
 
-    // プレーンジオメトリの情報を取得
-    this.sphereGeometry = WebGLGeometry.plane(size, size, color);
+    const segment = 64;
+    const radius = 1.0;
+    const sphereColor = [1.0, 1.0, 1.0, 1.0];
+
+    this.sphereGeometry = WebGLGeometry.sphere(
+      segment,
+      segment,
+      radius,
+      sphereColor
+    );
     // VBO と IBO を生成する
     this.sphereVBO = [
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.position),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.normal),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.color),
-      WebGLUtility.createVBO(this.gl, this.planeGeometry.texCoord),
+      WebGLUtility.createVBO(this.gl, this.sphereGeometry.position),
+      WebGLUtility.createVBO(this.gl, this.sphereGeometry.normal),
+      WebGLUtility.createVBO(this.gl, this.sphereGeometry.color),
+      WebGLUtility.createVBO(this.gl, this.sphereGeometry.texCoord),
     ];
-    this.sphereIBO = WebGLUtility.createIBO(this.gl, this.planeGeometry.index);
+    this.sphereIBO = WebGLUtility.createIBO(this.gl, this.sphereGeometry.index);
   }
 
   /**
@@ -326,6 +358,11 @@ class App {
       time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過 @@@
       alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ @@@
       mousePosition: gl.getUniformLocation(this.renderProgram, "mousePosition"), // マウス座標
+      noiseVisible: gl.getUniformLocation(this.renderProgram, "noiseVisible"), // ノイズの色を可視化するかどうか @@@
+      noiseDistortion: gl.getUniformLocation(
+        this.renderProgram,
+        "noiseDistortion"
+      ), // ノイズの歪み係数 @@@
     };
 
     // attribute location の取得
@@ -348,6 +385,15 @@ class App {
       useTexture: gl.getUniformLocation(this.offscreenProgram, "useTexture"),
       globalAlpha: gl.getUniformLocation(this.offscreenProgram, "globalAlpha"),
       resolution: gl.getUniformLocation(this.offscreenProgram, "resolution"), // 画面サイズ
+      time: gl.getUniformLocation(this.offscreenProgram, "time"), // 時間の経過 @@@
+      noiseVisible: gl.getUniformLocation(
+        this.offscreenProgram,
+        "noiseVisible"
+      ), // ノイズの色を可視化するかどうか @@@
+      noiseDistortion: gl.getUniformLocation(
+        this.offscreenProgram,
+        "noiseDistortion"
+      ), // ノイズの歪み係数 @@@
     };
   }
 
@@ -361,7 +407,7 @@ class App {
     // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // クリアする色と深度を設定する
-    gl.clearColor(0.3, 0.3, 0.3, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -382,7 +428,7 @@ class App {
     // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // クリアする色と深度を設定する
-    gl.clearColor(0.3, 0.3, 0.3, 1.0);
+    gl.clearColor(0.0, 0.5, 0.8, 1.0);
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -421,34 +467,26 @@ class App {
    */
   render() {
     const gl = this.gl;
-    // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
       requestAnimationFrame(this.render);
     }
-    // 現在までの経過時間
     const nowTime = (Date.now() - this.startTime) * 0.001;
 
     // - オフスクリーンレンダリング -------------------------------------------
     {
       // レンダリングのセットアップ
       this.setupOffscreenRendering();
-      // オフスクリーンシーン用のビュー行列を作る
+
+      // ビュー行列とプロジェクション行列を作成
       const v = this.camera.update();
-      // オフスクリーンシーン用のプロジェクション行列を作る
       const fovy = 45;
-      const aspect = window.innerWidth / window.innerHeight;
+      const aspect = this.canvas.width / this.canvas.height;
       const near = 0.1;
-      const far = 10.0;
+      const far = 20.0;
       const p = Mat4.perspective(fovy, aspect, near, far);
-      // オフスクリーン用のビュー・プロジェクション行列
       const vp = Mat4.multiply(p, v);
-      // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
-      const m = Mat4.identity();
-      // オフスクリーン用の MVP 行列
-      const mvp = Mat4.multiply(vp, m);
-      // オフスクリーン用の法線変換行列
-      const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-      // VBO と IBO
+
+      // VBO と IBO をバインド
       WebGLUtility.enableBuffer(
         gl,
         this.sphereVBO,
@@ -456,12 +494,8 @@ class App {
         this.offscreenAttStride,
         this.sphereIBO
       );
-      gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-      gl.uniformMatrix4fv(
-        this.offscreenUniLocation.normalMatrix,
-        false,
-        normalMatrix
-      );
+
+      // 共通のユニフォームを設定
       gl.uniform3fv(
         this.offscreenUniLocation.lightVector,
         Vec3.create(1.0, 1.0, 1.0)
@@ -472,25 +506,198 @@ class App {
         this.textureVisibility
       );
       gl.uniform1f(this.offscreenUniLocation.globalAlpha, this.globalAlpha);
-      // 画面サイズをシェーダーに渡す
       gl.uniform2f(
         this.offscreenUniLocation.resolution,
         this.canvas.width,
         this.canvas.height
       );
-      // 描画
-      gl.drawElements(
-        gl.TRIANGLES,
-        this.sphereGeometry.index.length,
-        gl.UNSIGNED_SHORT,
-        0
+      gl.uniform1f(this.offscreenUniLocation.time, this.timeSpeed * nowTime);
+      gl.uniform1i(
+        this.offscreenUniLocation.noiseVisible,
+        this.noiseVisible ? 1 : 0
       );
+      gl.uniform1f(
+        this.offscreenUniLocation.noiseDistortion,
+        this.noiseDistortion
+      );
+
+      // --- 第一の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        m = Mat4.translate(m, Vec3.create(0.0, 0.5, 0.0)); // 上に移動
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+
+      // --- 第二の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = -0.5;
+        const y = -0.25;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+
+      // --- 第三の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = 1.5;
+        const y = -0.25;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+
+      // --- 第四の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = 3.5;
+        const y = -1.5;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+      // --- 第五の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = -3.5;
+        const y = 0.75;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+
+      // --- 第六の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = -2.5;
+        const y = -1.8;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
+
+      // --- 第六の球体を描画 ---
+      {
+        let m = Mat4.identity();
+        const x = 3.5;
+        const y = 2.8;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
+        // MVP 行列と法線変換行列を計算
+        const mvp = Mat4.multiply(vp, m);
+        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
+        // シェーダーに行列を送る
+        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
+        gl.uniformMatrix4fv(
+          this.offscreenUniLocation.normalMatrix,
+          false,
+          normalMatrix
+        );
+        // 球体を描画
+        gl.drawElements(
+          gl.TRIANGLES,
+          this.sphereGeometry.index.length,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+      }
     }
     // ------------------------------------------------------------------------
 
     // - 最終シーンのレンダリング ---------------------------------------------
     {
-      // レンダリングのセットアップ
+      // この部分はそのままで問題ありません
       this.setupRendering();
 
       // VBO と IBO
@@ -501,18 +708,25 @@ class App {
         this.renderAttStride,
         this.planeIBO
       );
-      // シェーダに各種パラメータを送る
+      // ユニフォーム変数を設定
       gl.uniform1i(this.renderUniLocation.textureUnit, 0);
-      gl.uniform1i(this.renderUniLocation.useTypeOne, this.isTypeOne); // ノイズ生成ロジック１を使うかどうか @@@
-      gl.uniform1f(this.renderUniLocation.time, this.timeSpeed * nowTime); // 時間の経過 @@@
-      gl.uniform1f(this.renderUniLocation.alpha, this.alpha); // ノイズのアルファ @@@
-      // マウス座標をシェーダーに渡す
+      gl.uniform1i(this.renderUniLocation.useTypeOne, this.isTypeOne);
+      gl.uniform1f(this.renderUniLocation.time, this.timeSpeed * nowTime);
+      gl.uniform1f(this.renderUniLocation.alpha, this.alpha);
       gl.uniform2f(
         this.renderUniLocation.mousePosition,
         this.mousePosition.x,
         this.mousePosition.y
       );
-      // 描画
+      gl.uniform1f(
+        this.renderUniLocation.noiseDistortion,
+        this.noiseDistortion
+      );
+      gl.uniform1i(
+        this.renderUniLocation.noiseVisible,
+        this.noiseVisible ? 1 : 0
+      );
+      // 平面を描画
       gl.drawElements(
         gl.TRIANGLES,
         this.planeGeometry.index.length,
