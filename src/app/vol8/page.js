@@ -33,7 +33,7 @@ export default function Page() {
       }
     };
   }, []);
-  return <canvas id="webgl-canvas" />;
+  return <canvas id="webgl-canvas" style={{ cursor: "none" }} />;
 }
 
 /**
@@ -325,6 +325,7 @@ class App {
       useTypeOne: gl.getUniformLocation(this.renderProgram, "useTypeOne"), // ノイズの種類 @@@
       time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過 @@@
       alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ @@@
+      mousePosition: gl.getUniformLocation(this.renderProgram, "mousePosition"), // マウス座標
     };
 
     // attribute location の取得
@@ -346,10 +347,6 @@ class App {
       textureUnit: gl.getUniformLocation(this.offscreenProgram, "textureUnit"),
       useTexture: gl.getUniformLocation(this.offscreenProgram, "useTexture"),
       globalAlpha: gl.getUniformLocation(this.offscreenProgram, "globalAlpha"),
-      mousePosition: gl.getUniformLocation(
-        this.offscreenProgram,
-        "mousePosition"
-      ), // マウス座標
       resolution: gl.getUniformLocation(this.offscreenProgram, "resolution"), // 画面サイズ
     };
   }
@@ -385,7 +382,7 @@ class App {
     // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // クリアする色と深度を設定する
-    gl.clearColor(1.0, 0.6, 0.9, 1.0);
+    gl.clearColor(0.3, 0.3, 0.3, 1.0);
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -475,12 +472,6 @@ class App {
         this.textureVisibility
       );
       gl.uniform1f(this.offscreenUniLocation.globalAlpha, this.globalAlpha);
-      // マウス座標をシェーダーに渡す
-      gl.uniform2f(
-        this.offscreenUniLocation.mousePosition,
-        this.mousePosition.x,
-        this.mousePosition.y
-      );
       // 画面サイズをシェーダーに渡す
       gl.uniform2f(
         this.offscreenUniLocation.resolution,
@@ -515,6 +506,12 @@ class App {
       gl.uniform1i(this.renderUniLocation.useTypeOne, this.isTypeOne); // ノイズ生成ロジック１を使うかどうか @@@
       gl.uniform1f(this.renderUniLocation.time, this.timeSpeed * nowTime); // 時間の経過 @@@
       gl.uniform1f(this.renderUniLocation.alpha, this.alpha); // ノイズのアルファ @@@
+      // マウス座標をシェーダーに渡す
+      gl.uniform2f(
+        this.renderUniLocation.mousePosition,
+        this.mousePosition.x,
+        this.mousePosition.y
+      );
       // 描画
       gl.drawElements(
         gl.TRIANGLES,
