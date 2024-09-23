@@ -94,7 +94,7 @@ void main() {
   coord = clamp(coord, 0.0, 1.0);
 
   // 歪み係数を反映したテクスチャ座標でテクスチャの色をサンプリング
-  vec4 samplerColor = texture2D(textureUnit, coord);
+  vec4 textureColor = texture2D(textureUnit, coord);
 
-  gl_FragColor = samplerColor;
+  gl_FragColor = textureColor;
 }

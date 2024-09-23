@@ -4,7 +4,7 @@ uniform sampler2D textureUnit;
 uniform vec2 mousePosition; // マウス座標を追加
 uniform vec2 resolution;    // 画面サイズを追加
 uniform float time;
-uniform float noiseDistortion; // ノイズの歪み係数値 @@@
+uniform float noiseDistortion; // ノイズの歪み係数値
 
 varying vec4 vColor;
 varying vec2 vTexCoord;
@@ -20,7 +20,7 @@ float interpolate(float a, float b, float x){
     return a * (1.0 - f) + b * f;
 }
 
-// 乱数生成器（その２）
+// 乱数生成器
 float rnd(vec2 n){
   float a  = 0.129898;
   float b  = 0.78233;

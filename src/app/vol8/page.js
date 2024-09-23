@@ -12,7 +12,6 @@ export default function Page() {
     await app.load();
     app.setupGeometry();
     app.setupLocation();
-    // すべてのセットアップが完了したら描画を開始する
     app.start();
   };
   useEffect(() => {
@@ -67,12 +66,9 @@ class App {
   texture; // テクスチャ
   textureVisibility; // テクスチャの表示・非表示フラグ
   mousePosition; // マウス座標を保持する変数
-  timeSpeed; // 時間の経過速度係数 @@@
-  alpha; // ノイズに適用するアルファ値 @@@
-  noiseDistortion; // ノイズの歪み係数 @@@
-  cameraPosition;
-  cameraTarget;
-  upDirection;
+  timeSpeed; // 時間の経過速度係数
+  alpha; // ノイズに適用するアルファ値
+  noiseDistortion; // ノイズの歪み係数
 
   constructor(wrapper, width, height) {
     this.wrapper = wrapper;
@@ -118,29 +114,32 @@ class App {
     // 初期状態ではテクスチャが見えているようにする
     this.textureVisibility = false;
 
-    // マウス位置の初期化（キャンバス中央）
+    // マウス位置の初期化（キャンバス外の座標）
     this.mousePosition = {
-      x: -9999, // キャンバス外の座標
+      x: -9999,
       y: -9999,
     };
 
-    // 初期状態では時間の経過は 1.0 倍（早くも遅くもしない） @@@
-    this.timeSpeed = 1.0;
+    // 時間の経過
+    this.timeSpeed = 0.5;
 
-    // 初期状態ではノイズのアルファは 0.5 で半透明 @@@
+    // ノイズのアルファは 0.5 で半透明
     this.alpha = 0.5;
 
-    // 初期状態ではわずかに歪ませる @@@
+    // わずかに歪ませる
     this.noiseDistortion = 0.3;
   }
 
   /**
    * マウス移動時のイベントハンドラ
+   * キャンバスの原点は左上にあるため、Y座標を反転して
+   * 一般的な座標系（左下が原点）に合わせる
    */
   onMouseMove(event) {
     const rect = this.canvas.getBoundingClientRect();
     this.mousePosition.x = event.clientX - rect.left;
-    this.mousePosition.y = this.canvas.height - (event.clientY - rect.top); // Y座標を反転
+    // Y座標を反転
+    this.mousePosition.y = this.canvas.height - (event.clientY - rect.top);
   }
 
   /**
@@ -185,7 +184,7 @@ class App {
         const error = new Error("not initialized");
         reject(error);
       } else {
-        // 最終シーン用のシェーダ @@@
+        // 最終シーン用のシェーダ
         const renderVSSource = await WebGLUtility.loadFile(
           "/vol8/shader/render.vert"
         );
@@ -208,7 +207,7 @@ class App {
           renderFragmentShader
         );
 
-        // オフスクリーン用のシェーダ @@@
+        // オフスクリーン用のシェーダ
         const offscreenVSSource = await WebGLUtility.loadFile(
           "/vol8/shader/offscreen.vert"
         );
@@ -240,7 +239,6 @@ class App {
    */
   setupGeometry() {
     const color = [1.0, 1.0, 1.0, 1.0];
-    const size = 2.0;
     // plane は this.renderProgram と一緒に使う
     const planeSize = 2.0;
     this.planeGeometry = WebGLGeometry.plane(planeSize, planeSize, color);
@@ -252,14 +250,7 @@ class App {
 
     const segment = 64;
     const radius = 1.0;
-    const sphereColor = [1.0, 1.0, 1.0, 1.0];
-
-    this.sphereGeometry = WebGLGeometry.sphere(
-      segment,
-      segment,
-      radius,
-      sphereColor
-    );
+    this.sphereGeometry = WebGLGeometry.sphere(segment, segment, radius, color);
     // VBO と IBO を生成する
     this.sphereVBO = [
       WebGLUtility.createVBO(this.gl, this.sphereGeometry.position),
@@ -283,15 +274,13 @@ class App {
     this.renderAttStride = [3, 2];
     this.renderUniLocation = {
       textureUnit: gl.getUniformLocation(this.renderProgram, "textureUnit"), // テクスチャユニット
-      useTypeOne: gl.getUniformLocation(this.renderProgram, "useTypeOne"), // ノイズの種類 @@@
-      time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過 @@@
-      alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ @@@
+      time: gl.getUniformLocation(this.renderProgram, "time"), // 時間の経過
+      alpha: gl.getUniformLocation(this.renderProgram, "alpha"), // ノイズのアルファ
       mousePosition: gl.getUniformLocation(this.renderProgram, "mousePosition"), // マウス座標
-      // ノイズの色を可視化するかどうか @@@
       noiseDistortion: gl.getUniformLocation(
         this.renderProgram,
         "noiseDistortion"
-      ), // ノイズの歪み係数 @@@
+      ), // ノイズの歪み係数
     };
 
     // attribute location の取得
@@ -312,11 +301,11 @@ class App {
       ),
       textureUnit: gl.getUniformLocation(this.offscreenProgram, "textureUnit"),
       resolution: gl.getUniformLocation(this.offscreenProgram, "resolution"), // 画面サイズ
-      time: gl.getUniformLocation(this.offscreenProgram, "time"), // 時間の経過 @@@
+      time: gl.getUniformLocation(this.offscreenProgram, "time"), // 時間の経過
       noiseDistortion: gl.getUniformLocation(
         this.offscreenProgram,
         "noiseDistortion"
-      ), // ノイズの歪み係数 @@@
+      ), // ノイズの歪み係数
     };
   }
 
@@ -351,7 +340,7 @@ class App {
     // ビューポートを設定する
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // クリアする色と深度を設定する
-    gl.clearColor(0.0, 0.5, 0.8, 1.0);
+    gl.clearColor(0.15, 0.6, 0.8, 1.0);
     gl.clearDepth(1.0);
     // 色と深度をクリアする
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -437,7 +426,9 @@ class App {
       // --- 第一の球体を描画 ---
       {
         let m = Mat4.identity();
-        m = Mat4.translate(m, Vec3.create(0.0, 0.5, 0.0)); // 上に移動
+        const x = 0.0;
+        const y = 0.5;
+        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
         // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
@@ -463,17 +454,14 @@ class App {
         const x = -0.5;
         const y = -0.25;
         m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -488,17 +476,14 @@ class App {
         const x = 1.5;
         const y = -0.25;
         m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -513,17 +498,14 @@ class App {
         const x = 3.5;
         const y = -1.5;
         m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -537,18 +519,15 @@ class App {
         let m = Mat4.identity();
         const x = -3.5;
         const y = 0.75;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
+        m = Mat4.translate(m, Vec3.create(x, y, 1.0));
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -563,17 +542,14 @@ class App {
         const x = -2.5;
         const y = -1.8;
         m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -588,17 +564,14 @@ class App {
         const x = 3.5;
         const y = 2.8;
         m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
         const mvp = Mat4.multiply(vp, m);
         const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
           false,
           normalMatrix
         );
-        // 球体を描画
         gl.drawElements(
           gl.TRIANGLES,
           this.sphereGeometry.index.length,
@@ -611,7 +584,6 @@ class App {
 
     // - 最終シーンのレンダリング ---------------------------------------------
     {
-      // この部分はそのままで問題ありません
       this.setupRendering();
 
       // VBO と IBO
@@ -624,7 +596,6 @@ class App {
       );
       // ユニフォーム変数を設定
       gl.uniform1i(this.renderUniLocation.textureUnit, 0);
-      gl.uniform1i(this.renderUniLocation.useTypeOne, this.isTypeOne);
       gl.uniform1f(this.renderUniLocation.time, this.timeSpeed * nowTime);
       gl.uniform1f(this.renderUniLocation.alpha, this.alpha);
       gl.uniform2f(
