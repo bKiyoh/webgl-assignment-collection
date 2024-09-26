@@ -13,7 +13,7 @@
 ### CONTENTS
 
 - [Vol1](https://webgl-collection-sigma.vercel.app/vol1)
-- - aa
+ - aa
 
 [Vol7](https://webgl-collection-sigma.vercel.app/vol7) で使用している画像は以下のものになります
 
