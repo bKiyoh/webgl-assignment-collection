@@ -4,6 +4,7 @@
 
 ### 使用技術一覧
 - Next.js
+- shadcn/ui
 - Three.js
 - WebGL
 
