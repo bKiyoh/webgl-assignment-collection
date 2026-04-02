@@ -175,22 +175,23 @@ class App {
    * @return {Promise}
    */
   load() {
-    return new Promise(async (resolve, reject) => {
-      // 変数に WebGL コンテキストを代入しておく（コード記述の最適化）
-      const gl = this.gl;
-      // WebGL コンテキストがあるかどうか確認する
-      if (gl == null) {
-        // もし WebGL コンテキストがない場合はエラーとして Promise を reject する
-        const error = new Error("not initialized");
-        reject(error);
-      } else {
-        // 最終シーン用のシェーダ
-        const renderVSSource = await WebGLUtility.loadFile(
-          "/vol8/shader/render.vert"
-        );
-        const renderFSSource = await WebGLUtility.loadFile(
-          "/vol8/shader/render.frag"
-        );
+    const gl = this.gl;
+    if (gl == null) {
+      return Promise.reject(new Error("not initialized"));
+    }
+
+    return WebGLUtility.loadFiles([
+      "/vol8/shader/render.vert",
+      "/vol8/shader/render.frag",
+      "/vol8/shader/offscreen.vert",
+      "/vol8/shader/offscreen.frag",
+    ]).then(
+      ([
+        renderVSSource,
+        renderFSSource,
+        offscreenVSSource,
+        offscreenFSSource,
+      ]) => {
         const renderVertexShader = WebGLUtility.createShaderObject(
           gl,
           renderVSSource,
@@ -207,13 +208,6 @@ class App {
           renderFragmentShader
         );
 
-        // オフスクリーン用のシェーダ
-        const offscreenVSSource = await WebGLUtility.loadFile(
-          "/vol8/shader/offscreen.vert"
-        );
-        const offscreenFSSource = await WebGLUtility.loadFile(
-          "/vol8/shader/offscreen.frag"
-        );
         const offscreenVertexShader = WebGLUtility.createShaderObject(
           gl,
           offscreenVSSource,
@@ -229,9 +223,8 @@ class App {
           offscreenVertexShader,
           offscreenFragmentShader
         );
-        resolve();
       }
-    });
+    );
   }
 
   /**

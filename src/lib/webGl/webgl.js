@@ -2,19 +2,37 @@
  * WebGL の API を目的別にまとめたユーティリティクラス
  */
 export class WebGLUtility {
+  static fileCache = new Map();
+  static imageCache = new Map();
+
   /**
    * ファイルをプレーンテキストとして読み込む
    * @param {string} path - 読み込むファイルのパス
    * @return {Promise}
    */
   static loadFile(path) {
-    return new Promise(async (resolve) => {
-      // fetch を使ってファイルにアクセスする
-      const response = await fetch(path);
-      const text = await response.text();
-      // テキストを引数に Promise を解決する
-      resolve(text);
+    if (this.fileCache.has(path)) {
+      return this.fileCache.get(path);
+    }
+
+    const request = fetch(path, { cache: "force-cache" }).then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`failed to load file: ${path}`);
+      }
+      return response.text();
     });
+
+    this.fileCache.set(path, request);
+    return request;
+  }
+
+  /**
+   * 複数ファイルを並列で読み込む
+   * @param {Array.<string>} paths - 読み込むファイルのパス一覧
+   * @return {Promise<Array.<string>>}
+   */
+  static loadFiles(paths) {
+    return Promise.all(paths.map((path) => this.loadFile(path)));
   }
 
   /**
@@ -23,9 +41,14 @@ export class WebGLUtility {
    * @return {Promise}
    */
   static loadImage(path) {
-    return new Promise((resolve) => {
+    if (this.imageCache.has(path)) {
+      return this.imageCache.get(path);
+    }
+
+    const request = new Promise((resolve, reject) => {
       // Image オブジェクトの生成
       const img = new Image();
+      img.decoding = "async";
       // ロード完了を検出したいので、先にイベントを設定する
       img.addEventListener(
         "load",
@@ -35,9 +58,28 @@ export class WebGLUtility {
         },
         false
       );
+      img.addEventListener(
+        "error",
+        () => {
+          reject(new Error(`failed to load image: ${path}`));
+        },
+        false
+      );
       // 読み込む画像のパスを設定する
       img.src = path;
     });
+
+    this.imageCache.set(path, request);
+    return request;
+  }
+
+  /**
+   * 複数画像を並列で読み込む
+   * @param {Array.<string>} paths - 読み込む画像のパス一覧
+   * @return {Promise<Array.<HTMLImageElement>>}
+   */
+  static loadImages(paths) {
+    return Promise.all(paths.map((path) => this.loadImage(path)));
   }
 
   /**

@@ -123,44 +123,40 @@ class App {
    * @return {Promise}
    */
   load() {
-    return new Promise(async (resolve, reject) => {
-      // 変数に WebGL コンテキストを代入しておく（コード記述の最適化）
-      const gl = this.gl;
-      // WebGL コンテキストがあるかどうか確認する
-      if (gl == null) {
-        // もし WebGL コンテキストがない場合はエラーとして Promise を reject する
-        const error = new Error("not initialized");
-        reject(error);
-      } else {
-        // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile("/vol7/shader/main.vert");
-        const FSSource = await WebGLUtility.loadFile("/vol7/shader/main.frag");
-        // 無事に読み込めたらシェーダオブジェクトの実体を生成する
-        const vertexShader = WebGLUtility.createShaderObject(
-          gl,
-          VSSource,
-          gl.VERTEX_SHADER
-        );
-        const fragmentShader = WebGLUtility.createShaderObject(
-          gl,
-          FSSource,
-          gl.FRAGMENT_SHADER
-        );
-        this.program = WebGLUtility.createProgramObject(
-          gl,
-          vertexShader,
-          fragmentShader
-        );
-        // 画像を読み込み、テクスチャを初期化する
-        const image = await WebGLUtility.loadImage("/vol7/sample.jpg");
-        const image1 = await WebGLUtility.loadImage("/vol7/sample1.jpg");
-        const image2 = await WebGLUtility.loadImage("/vol7/sample2.jpg");
-        this.texture = WebGLUtility.createTexture(gl, image);
-        this.texture1 = WebGLUtility.createTexture(gl, image1);
-        this.texture2 = WebGLUtility.createTexture(gl, image2);
-        // Promsie を解決
-        resolve();
-      }
+    const gl = this.gl;
+    if (gl == null) {
+      return Promise.reject(new Error("not initialized"));
+    }
+
+    return Promise.all([
+      WebGLUtility.loadFiles([
+        "/vol7/shader/main.vert",
+        "/vol7/shader/main.frag",
+      ]),
+      WebGLUtility.loadImages([
+        "/vol7/sample.jpg",
+        "/vol7/sample1.jpg",
+        "/vol7/sample2.jpg",
+      ]),
+    ]).then(([[VSSource, FSSource], [image, image1, image2]]) => {
+      const vertexShader = WebGLUtility.createShaderObject(
+        gl,
+        VSSource,
+        gl.VERTEX_SHADER
+      );
+      const fragmentShader = WebGLUtility.createShaderObject(
+        gl,
+        FSSource,
+        gl.FRAGMENT_SHADER
+      );
+      this.program = WebGLUtility.createProgramObject(
+        gl,
+        vertexShader,
+        fragmentShader
+      );
+      this.texture = WebGLUtility.createTexture(gl, image);
+      this.texture1 = WebGLUtility.createTexture(gl, image1);
+      this.texture2 = WebGLUtility.createTexture(gl, image2);
     });
   }
 

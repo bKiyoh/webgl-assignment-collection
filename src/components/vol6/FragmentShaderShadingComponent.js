@@ -170,40 +170,30 @@ class App {
    * @return {Promise}
    */
   load() {
-    return new Promise(async (resolve, reject) => {
-      // 変数に WebGL コンテキストを代入しておく（コード記述の最適化）
-      const gl = this.gl;
-      // WebGL コンテキストがあるかどうか確認する
-      if (gl == null) {
-        // もし WebGL コンテキストがない場合はエラーとして Promise を reject する
-        const error = new Error("not initialized");
-        reject(error);
-      } else {
-        // まずシェーダのソースコードを読み込む
-        const VSSource = await WebGLUtility.loadFile(
-          "/vol6/shader/FragmentShaderShading/main.vert"
-        );
-        const FSSource = await WebGLUtility.loadFile(
-          "/vol6/shader/FragmentShaderShading/main.frag"
-        );
-        // 無事に読み込めたらシェーダオブジェクトの実体を生成する
-        const vertexShader = WebGLUtility.createShaderObject(
-          gl,
-          VSSource,
-          gl.VERTEX_SHADER
-        );
-        const fragmentShader = WebGLUtility.createShaderObject(
-          gl,
-          FSSource,
-          gl.FRAGMENT_SHADER
-        );
-        this.program = WebGLUtility.createProgramObject(
-          gl,
-          vertexShader,
-          fragmentShader
-        );
-        resolve();
-      }
+    const gl = this.gl;
+    if (gl == null) {
+      return Promise.reject(new Error("not initialized"));
+    }
+
+    return WebGLUtility.loadFiles([
+      "/vol6/shader/FragmentShaderShading/main.vert",
+      "/vol6/shader/FragmentShaderShading/main.frag",
+    ]).then(([VSSource, FSSource]) => {
+      const vertexShader = WebGLUtility.createShaderObject(
+        gl,
+        VSSource,
+        gl.VERTEX_SHADER
+      );
+      const fragmentShader = WebGLUtility.createShaderObject(
+        gl,
+        FSSource,
+        gl.FRAGMENT_SHADER
+      );
+      this.program = WebGLUtility.createProgramObject(
+        gl,
+        vertexShader,
+        fragmentShader
+      );
     });
   }
 
