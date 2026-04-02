@@ -246,58 +246,46 @@ class ThreeApp {
     const offsetX = ((gridWidth - 1) * spacingX) / 2;
     const offsetY = ((gridHeight - 1) * spacingY) / 2;
 
-    this.load().then(() => {
-      this.planeMeshArray = [];
-      this.objectGroups = [];
+    this.planeMeshArray = [];
+    this.objectGroups = [];
+    const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
 
-      for (let i = 0; i < 5; i++) {
-        for (let j = 0; j < 3; j++) {
-          const subGroup = new THREE.Group();
-          // サブグループの位置を設定（位置の軸を設定）
-          subGroup.position.set(
-            i * spacingX - offsetX,
-            j * spacingY - offsetY,
-            0
-          );
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 3; j++) {
+        const subGroup = new THREE.Group();
+        // サブグループの位置を設定（位置の軸を設定）
+        subGroup.position.set(i * spacingX - offsetX, j * spacingY - offsetY, 0);
 
-          const index = i * 3 + j; // インデックス計算
+        const index = i * 3 + j; // インデックス計算
 
-          // テクスチャ用板ポリゴン（前面）
-          const planeGeometry = new THREE.PlaneGeometry(11.0, 11.0);
-          const frontPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.frontTextures[index],
-            side: THREE.FrontSide,
-          });
-          const frontPlaneMesh = new THREE.Mesh(
-            planeGeometry,
-            frontPlaneMaterial
-          );
-          frontPlaneMesh.position.z = 0.25;
-          subGroup.add(frontPlaneMesh);
+        // テクスチャ用板ポリゴン（前面）
+        const frontPlaneMaterial = new THREE.MeshBasicMaterial({
+          map: this.frontTextures[index],
+          side: THREE.FrontSide,
+        });
+        const frontPlaneMesh = new THREE.Mesh(planeGeometry, frontPlaneMaterial);
+        frontPlaneMesh.position.z = 0.25;
+        subGroup.add(frontPlaneMesh);
 
-          // テクスチャ用板ポリゴン（背面）
-          const backPlaneMaterial = new THREE.MeshBasicMaterial({
-            map: this.backTextures[index],
-            side: THREE.BackSide,
-          });
-          const backPlaneMesh = new THREE.Mesh(
-            planeGeometry,
-            backPlaneMaterial
-          );
-          backPlaneMesh.position.z = -0.25;
-          subGroup.add(backPlaneMesh);
+        // テクスチャ用板ポリゴン（背面）
+        const backPlaneMaterial = new THREE.MeshBasicMaterial({
+          map: this.backTextures[index],
+          side: THREE.BackSide,
+        });
+        const backPlaneMesh = new THREE.Mesh(planeGeometry, backPlaneMaterial);
+        backPlaneMesh.position.z = -0.25;
+        subGroup.add(backPlaneMesh);
 
-          this.objectGroups.push(subGroup);
-          this.scene.add(subGroup);
+        this.objectGroups.push(subGroup);
+        this.scene.add(subGroup);
 
-          const planes = {
-            frontPlane: frontPlaneMesh,
-            backPlane: backPlaneMesh,
-          };
-          this.planeMeshArray.push(planes);
-        }
+        const planes = {
+          frontPlane: frontPlaneMesh,
+          backPlane: backPlaneMesh,
+        };
+        this.planeMeshArray.push(planes);
       }
-    });
+    }
     this.isAnimating = false;
   }
 
@@ -307,44 +295,28 @@ class ThreeApp {
   load() {
     this.frontTextures = [];
     this.backTextures = [];
+    const textureLoader = new THREE.TextureLoader();
     const promises = [];
 
     for (let i = 0; i < 15; i++) {
       const frontTexturePath = `/vol4/light/${i}.jpg`;
       const backTexturePath = `/vol4/flower/${i}.jpg`;
-      const textureLoader = new THREE.TextureLoader();
-      const frontTexturePromise = new Promise((resolve, reject) => {
-        textureLoader.load(
-          frontTexturePath,
-          (texture) => {
-            this.frontTextures[i] = texture;
-            resolve();
-          },
-          undefined,
-          (err) => {
-            reject(err);
-          }
-        );
-      });
-      const backTexturePromise = new Promise((resolve, reject) => {
-        textureLoader.load(
-          backTexturePath,
-          (texture) => {
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(-1, 1);
-            this.backTextures[i] = texture;
-            resolve();
-          },
-          undefined,
-          (err) => {
-            reject(err);
-          }
-        );
-      });
-      promises.push(frontTexturePromise);
-      promises.push(backTexturePromise);
+
+      promises.push(
+        textureLoader.loadAsync(frontTexturePath).then((texture) => {
+          this.frontTextures[i] = texture;
+        })
+      );
+      promises.push(
+        textureLoader.loadAsync(backTexturePath).then((texture) => {
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.RepeatWrapping;
+          texture.repeat.set(-1, 1);
+          this.backTextures[i] = texture;
+        })
+      );
     }
+
     return Promise.all(promises);
   }
 
