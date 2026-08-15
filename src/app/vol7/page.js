@@ -282,9 +282,6 @@ class App {
     // レンダリングのセットアップ
     this.setupRendering();
 
-    // モデル座標変換行列（ここでは特になにもモデル座標変換は掛けていない）
-    const m = Mat4.identity();
-
     // ビュー・プロジェクション座標変換行列
     const v = Mat4.lookAt(
       this.cameraPosition,

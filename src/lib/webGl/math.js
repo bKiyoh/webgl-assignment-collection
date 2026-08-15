@@ -513,8 +513,8 @@ export class Mat4 {
     v[1] /= v[3];
     v[2] /= v[3];
     const out = Vec2.create();
-    out[0] = halfWidth + v[0] * halfWidth,
-    out[1] = halfHeight - v[1] * halfHeight
+    out[0] = halfWidth + v[0] * halfWidth;
+    out[1] = halfHeight - v[1] * halfHeight;
     return out;
   }
 }

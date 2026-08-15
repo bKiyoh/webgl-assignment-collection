@@ -150,7 +150,7 @@ class ThreeApp {
     );
     window.addEventListener(
       "keyup",
-      (keyEvent) => {
+      () => {
         this.isDown = false;
       },
       false
