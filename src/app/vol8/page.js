@@ -1,28 +1,29 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
 
 export default function Page() {
-  const initializedRef = useRef(false);
-  const initAndLoad = async (app) => {
-    app.init();
-    await app.load();
-    app.setupGeometry();
-    app.setupLocation();
-    app.start();
-  };
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl-canvas");
-    if (wrapper && !initializedRef.current) {
-      const app = new App(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new App(wrapper, width, height);
+      app.init();
+      app.load().then(() => {
+        if (!active) return;
+        app.setupGeometry();
+        app.setupLocation();
+        app.start();
+      });
     }
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -40,6 +41,18 @@ class App {
   static RENDERER_PARAM = {
     rendererRatio: 120,
   };
+
+  static SPHERE_POSITIONS = [
+    Vec3.create(0.0, 0.5, 0.0),
+    Vec3.create(-0.5, -0.25, 0.0),
+    Vec3.create(1.5, -0.25, 0.0),
+    Vec3.create(3.5, -1.5, 0.0),
+    Vec3.create(-3.5, 0.75, 1.0),
+    Vec3.create(-2.5, -1.8, 0.0),
+    Vec3.create(3.5, 2.8, 0.0),
+  ];
+
+  static LIGHT_VECTOR = Vec3.create(1.0, 1.0, 1.0);
 
   width;
   height;
@@ -78,6 +91,7 @@ class App {
     this.render = this.render.bind(this);
     // マウスイベントのハンドラをバインド
     this.onMouseMove = this.onMouseMove.bind(this);
+    this.isDisposed = false;
   }
 
   /**
@@ -147,6 +161,8 @@ class App {
    */
   resize() {
     const gl = this.gl;
+    this.width = window.innerWidth - App.RENDERER_PARAM.rendererRatio;
+    this.height = window.innerHeight - App.RENDERER_PARAM.rendererRatio;
     this.canvas.width = this.width;
     this.canvas.height = this.height;
 
@@ -192,6 +208,7 @@ class App {
         offscreenVSSource,
         offscreenFSSource,
       ]) => {
+        if (this.isDisposed) return;
         const renderVertexShader = WebGLUtility.createShaderObject(
           gl,
           renderVSSource,
@@ -373,7 +390,7 @@ class App {
   render() {
     const gl = this.gl;
     if (this.isRendering === true) {
-      requestAnimationFrame(this.render);
+      this.animationFrameId = requestAnimationFrame(this.render);
     }
     const nowTime = (Date.now() - this.startTime) * 0.001;
 
@@ -403,7 +420,7 @@ class App {
       // 共通のユニフォームを設定
       gl.uniform3fv(
         this.offscreenUniLocation.lightVector,
-        Vec3.create(1.0, 1.0, 1.0)
+        App.LIGHT_VECTOR
       );
       gl.uniform1i(this.offscreenUniLocation.textureUnit, 0);
       gl.uniform2f(
@@ -416,39 +433,11 @@ class App {
         this.offscreenUniLocation.noiseDistortion,
         this.noiseDistortion
       );
-      // --- 第一の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = 0.0;
-        const y = 0.5;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        // MVP 行列と法線変換行列を計算
+      // 球体は平行移動だけなので法線変換行列を共通化できる
+      const normalMatrix = Mat4.identity();
+      App.SPHERE_POSITIONS.forEach((position) => {
+        const m = Mat4.translate(Mat4.identity(), position);
         const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        // シェーダーに行列を送る
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        // 球体を描画
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
-
-      // --- 第二の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = -0.5;
-        const y = -0.25;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
         gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
         gl.uniformMatrix4fv(
           this.offscreenUniLocation.normalMatrix,
@@ -461,117 +450,7 @@ class App {
           gl.UNSIGNED_SHORT,
           0
         );
-      }
-
-      // --- 第三の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = 1.5;
-        const y = -0.25;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
-
-      // --- 第四の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = 3.5;
-        const y = -1.5;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
-
-      // --- 第五の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = -3.5;
-        const y = 0.75;
-        m = Mat4.translate(m, Vec3.create(x, y, 1.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
-
-      // --- 第六の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = -2.5;
-        const y = -1.8;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
-
-      // --- 第七の球体を描画 ---
-      {
-        let m = Mat4.identity();
-        const x = 3.5;
-        const y = 2.8;
-        m = Mat4.translate(m, Vec3.create(x, y, 0.0));
-        const mvp = Mat4.multiply(vp, m);
-        const normalMatrix = Mat4.transpose(Mat4.inverse(m));
-        gl.uniformMatrix4fv(this.offscreenUniLocation.mvpMatrix, false, mvp);
-        gl.uniformMatrix4fv(
-          this.offscreenUniLocation.normalMatrix,
-          false,
-          normalMatrix
-        );
-        gl.drawElements(
-          gl.TRIANGLES,
-          this.sphereGeometry.index.length,
-          gl.UNSIGNED_SHORT,
-          0
-        );
-      }
+      });
     }
     // ------------------------------------------------------------------------
 
@@ -609,5 +488,14 @@ class App {
       );
     }
     // ------------------------------------------------------------------------
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    this.stop();
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("resize", this.resize, false);
+    this.canvas.removeEventListener("mousemove", this.onMouseMove, false);
+    this.gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

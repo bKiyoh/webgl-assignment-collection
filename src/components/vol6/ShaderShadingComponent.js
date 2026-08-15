@@ -1,53 +1,52 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { Vec3, Mat4 } from "@/lib/webGl/math.js";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 import { WebGLOrbitCamera } from "@/lib/webGl/camera.js";
 
-export function VertexShaderShadingComponent() {
-  const initializedRef = useRef(false);
-
-  const initAndLoad = async (app) => {
-    app.init();
-    await app.load();
-    app.setupGeometry();
-    app.setupLocation();
-    // すべてのセットアップが完了したら描画を開始する
-    app.start();
-
-    const parameter = {
-      culling: true,
-      depthTest: true,
-      rotation: true,
-    };
-    // バックフェイスカリングの有効・無効
-    app.setCulling(parameter.culling);
-    // 深度テストの有効・無効
-    app.setDepthTest(parameter.depthTest);
-    // 回転の有無
-    app.setRotation(parameter.rotation);
-  };
-
+export function ShaderShadingComponent({
+  canvasId,
+  vertexShaderPath,
+  fragmentShaderPath,
+}) {
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
-    const wrapper = document.querySelector("#webgl-canvas-1");
-    if (wrapper && !initializedRef.current) {
-      const app = new App(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    const wrapper = document.querySelector(`#${canvasId}`);
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new App(
+        wrapper,
+        width,
+        height,
+        vertexShaderPath,
+        fragmentShaderPath
+      );
+      app.init();
+      app.load().then(() => {
+        if (!active) return;
+        app.setupGeometry();
+        app.setupLocation();
+        app.start();
+        app.setCulling(true);
+        app.setDepthTest(true);
+        app.setRotation(true);
+      });
     }
 
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
         }
       }
     };
-  }, []);
+  }, [canvasId, fragmentShaderPath, vertexShaderPath]);
 
-  return <canvas id="webgl-canvas-1" />;
+  return <canvas id={canvasId} />;
 }
 
 /**
@@ -75,12 +74,15 @@ class App {
   camera; // WebGLOrbitCamera のインスタンス
   lightPosition; // ライトの位置 @@@
 
-  constructor(wrapper, width, height) {
+  constructor(wrapper, width, height, vertexShaderPath, fragmentShaderPath) {
     this.wrapper = wrapper;
     this.width = width;
     this.height = height;
+    this.vertexShaderPath = vertexShaderPath;
+    this.fragmentShaderPath = fragmentShaderPath;
     this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
+    this.isDisposed = false;
   }
 
   /**
@@ -158,6 +160,8 @@ class App {
    * リサイズ処理
    */
   resize() {
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
     const size = Math.min(
       this.width - App.RENDERER_PARAM.rendererRatio,
       this.height - App.RENDERER_PARAM.rendererRatio
@@ -177,9 +181,10 @@ class App {
     }
 
     return WebGLUtility.loadFiles([
-      "/vol6/shader/VertexShaderShading/main.vert",
-      "/vol6/shader/VertexShaderShading/main.frag",
+      this.vertexShaderPath,
+      this.fragmentShaderPath,
     ]).then(([VSSource, FSSource]) => {
+      if (this.isDisposed) return;
       const vertexShader = WebGLUtility.createShaderObject(
         gl,
         VSSource,
@@ -289,7 +294,7 @@ class App {
 
     // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
-      requestAnimationFrame(this.render);
+      this.animationFrameId = requestAnimationFrame(this.render);
     }
 
     // 現在までの経過時間
@@ -344,5 +349,13 @@ class App {
       gl.UNSIGNED_SHORT,
       0
     );
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    this.stop();
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("resize", this.resize, false);
+    this.gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

@@ -1,6 +1,5 @@
 "use client";
-import { VertexShaderShadingComponent } from "@/components/vol6/VertexShaderShadingComponent.js";
-import { FragmentShaderShadingComponent } from "@/components/vol6/FragmentShaderShadingComponent.js";
+import { ShaderShadingComponent } from "@/components/vol6/ShaderShadingComponent.js";
 
 export default function Page() {
   return (
@@ -20,7 +19,11 @@ export default function Page() {
           }}
         >
           <span>VertexShaderShading</span>
-          <VertexShaderShadingComponent />
+          <ShaderShadingComponent
+            canvasId="webgl-canvas-1"
+            vertexShaderPath="/vol6/shader/VertexShaderShading/main.vert"
+            fragmentShaderPath="/vol6/shader/VertexShaderShading/main.frag"
+          />
         </div>
         <div
           style={{
@@ -30,7 +33,11 @@ export default function Page() {
           }}
         >
           <span>FragmentShaderShading</span>
-          <FragmentShaderShadingComponent />
+          <ShaderShadingComponent
+            canvasId="webgl-canvas-2"
+            vertexShaderPath="/vol6/shader/FragmentShaderShading/main.vert"
+            fragmentShaderPath="/vol6/shader/FragmentShaderShading/main.frag"
+          />
         </div>
       </div>
     </div>

@@ -1,31 +1,57 @@
 "use client";
-import { useEffect, useRef } from "react";
-import * as THREE from "@/lib/threeJs/three.module.js";
+import { useEffect } from "react";
+import {
+  BoxGeometry,
+  Clock,
+  Color,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+} from "@/lib/threeJs/three.module.js";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 import { EffectComposer } from "@/lib/threeJs/EffectComposer.js";
 import { RenderPass } from "@/lib/threeJs/RenderPass.js";
 import { UnrealBloomPass } from "@/lib/threeJs/UnrealBloomPass.js";
 
+const THREE = {
+  BoxGeometry,
+  Clock,
+  Color,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+};
+
 export default function Page() {
-  const initializedRef = useRef(false);
-
-  // ThreeAppの初期化とロードを行う関数
-  const initAndLoad = async (app) => {
-    await app.load();
-    app.init();
-    app.render();
-  };
-
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl");
-    if (wrapper && !initializedRef.current) {
-      const app = new ThreeApp(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new ThreeApp(wrapper, width, height);
+      app.load().then(() => {
+        if (!active) return;
+        app.init();
+        app.render();
+      });
     }
 
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -150,36 +176,37 @@ class ThreeApp {
     this.width = width;
     this.height = height;
     this.render = this.render.bind(this);
+    this.onKeyDown = this.onKeyDown.bind(this);
+    this.onKeyUp = this.onKeyUp.bind(this);
+    this.onResize = this.onResize.bind(this);
+    this.isDisposed = false;
 
-    window.addEventListener(
-      "keydown",
-      (keyEvent) => {
-        switch (keyEvent.key) {
-          case " ":
-            this.isDown = true;
-            break;
-          default:
-        }
-      },
-      false
-    );
-    window.addEventListener(
-      "keyup",
-      () => {
-        this.isDown = false;
-      },
-      false
-    );
+    window.addEventListener("keydown", this.onKeyDown, false);
+    window.addEventListener("keyup", this.onKeyUp, false);
+    window.addEventListener("resize", this.onResize, false);
+  }
 
-    window.addEventListener(
-      "resize",
-      () => {
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.camera.aspect = this.aspect;
-        this.camera.updateProjectionMatrix();
-      },
-      false
+  onKeyDown(keyEvent) {
+    if (keyEvent.key === " ") {
+      this.isDown = true;
+    }
+  }
+
+  onKeyUp() {
+    this.isDown = false;
+  }
+
+  onResize() {
+    if (!this.renderer || !this.camera) return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    this.renderer.setSize(
+      width - ThreeApp.RENDERER_PARAM.rendererRatio,
+      height - ThreeApp.RENDERER_PARAM.rendererRatio
     );
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.composer?.setSize(width, height);
   }
 
   /**
@@ -188,6 +215,10 @@ class ThreeApp {
   load() {
     const loader = new THREE.TextureLoader();
     return loader.loadAsync("/vol3/sphere.jpg").then((sphereTexture) => {
+      if (this.isDisposed) {
+        sphereTexture.dispose();
+        return;
+      }
       this.sphereTexture = sphereTexture; // 球体テクスチャをロード
     });
   }
@@ -525,7 +556,7 @@ class ThreeApp {
 
   // 描画処理
   render() {
-    requestAnimationFrame(this.render);
+    this.animationFrameId = requestAnimationFrame(this.render);
 
     this.controls.update();
 
@@ -537,5 +568,18 @@ class ThreeApp {
     }
 
     this.composer.render();
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("keydown", this.onKeyDown, false);
+    window.removeEventListener("keyup", this.onKeyUp, false);
+    window.removeEventListener("resize", this.onResize, false);
+    this.controls?.dispose();
+    this.composer?.dispose();
+    this.sphereTexture?.dispose();
+    this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
   }
 }
