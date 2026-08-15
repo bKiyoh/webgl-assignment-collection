@@ -1,7 +1,27 @@
 "use client";
 import { useEffect } from "react";
-import * as THREE from "@/lib/threeJs/three.module.js";
+import {
+  Color,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  TorusKnotGeometry,
+  Vector3,
+  WebGLRenderer,
+} from "@/lib/threeJs/three.module.js";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
+
+const THREE = {
+  Color,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  TorusKnotGeometry,
+  Vector3,
+  WebGLRenderer,
+};
 
 export default function Home() {
   useEffect(() => {
@@ -11,6 +31,7 @@ export default function Home() {
     app.render();
 
     return () => {
+      app.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -125,6 +146,9 @@ class ThreeApp {
 
     // this のバインド
     this.render = this.render.bind(this);
+    this.onKeyDown = this.onKeyDown.bind(this);
+    this.onKeyUp = this.onKeyUp.bind(this);
+    this.onResize = this.onResize.bind(this);
 
     // キーの押下状態を保持するフラグ
     this.isDown = false;
@@ -135,49 +159,39 @@ class ThreeApp {
     this.currentQ = ThreeApp.GEOMETRY_PARAM.q;
 
     // キーの押下や離す操作を検出できるようにする
-    window.addEventListener(
-      "keydown",
-      (keyEvent) => {
-        // スペースキーが押されている場合はフラグを立てる
-        switch (keyEvent.key) {
-          case " ":
-            this.isDown = true;
-            break;
-          default:
-        }
-      },
-      false
+    window.addEventListener("keydown", this.onKeyDown, false);
+    window.addEventListener("keyup", this.onKeyUp, false);
+    window.addEventListener("resize", this.onResize, false);
+  }
+
+  onKeyDown(keyEvent) {
+    if (keyEvent.key === " ") {
+      this.isDown = true;
+    }
+  }
+
+  onKeyUp() {
+    this.isDown = false;
+  }
+
+  onResize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    this.renderer.setSize(
+      width - ThreeApp.RENDERER_PARAM.rendererRatio,
+      height - ThreeApp.RENDERER_PARAM.rendererRatio
     );
-    window.addEventListener(
-      "keyup",
-      () => {
-        this.isDown = false;
-      },
-      false
-    );
-    window.addEventListener(
-      "resize",
-      () => {
-        // レンダラの大きさを設定
-        this.renderer.setSize(width, height);
-        // カメラが撮影する視錐台のアスペクト比を再設定
-        this.camera.aspect = this.aspect;
-        // カメラのパラメータが変更されたときは行列を更新する
-        this.camera.updateProjectionMatrix();
-      },
-      false
-    );
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
   }
 
   render() {
-    requestAnimationFrame(this.render);
+    this.animationFrameId = requestAnimationFrame(this.render);
     this.controls.update();
 
     if (this.isDown === true) {
       // マウスが押されている場合の処理を開始
-      this.scene.remove(this.box); // 現在のボックスをシーンから削除
       this.box.geometry.dispose(); // 現在のボックスのジオメトリを破棄
-      this.box.material.dispose(); // 現在のボックスのマテリアルを破棄
 
       // ランダムなパラメータを生成
       this.tube = Math.random() * 0.6;
@@ -206,11 +220,22 @@ class ThreeApp {
         this.currentP,
         this.currentQ
       );
-      // 新しいボックスメッシュを作成し、シーンに追加
-      this.box = new THREE.Mesh(this.geometry, this.material);
-      this.scene.add(this.box);
+      // 既存メッシュのジオメトリだけを差し替える
+      this.box.geometry = this.geometry;
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("keydown", this.onKeyDown, false);
+    window.removeEventListener("keyup", this.onKeyUp, false);
+    window.removeEventListener("resize", this.onResize, false);
+    this.controls.dispose();
+    this.box.geometry.dispose();
+    this.material.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 }

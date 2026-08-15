@@ -1,30 +1,28 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { blueColors, purpleColors, aquaColors } from "./vol5Color.js";
 
 export default function Page() {
-  const initializedRef = useRef(false);
-
-  const initAndLoad = async (app) => {
-    app.init();
-    await app.load();
-    app.setupGeometry();
-    app.setupLocation();
-    // すべてのセットアップが完了したら描画を開始する
-    app.start();
-  };
-
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl-canvas");
-    if (wrapper && !initializedRef.current) {
-      const app = new App(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new App(wrapper, width, height);
+      app.init();
+      app.load().then(() => {
+        if (!active) return;
+        app.setupGeometry();
+        app.setupLocation();
+        app.start();
+      });
     }
 
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -64,6 +62,7 @@ class App {
     this.width = width;
     this.height = height;
     this.render = this.render.bind(this);
+    this.isDisposed = false;
   }
 
   /**
@@ -95,6 +94,7 @@ class App {
       "/vol5/shader/main.vert",
       "/vol5/shader/main.frag",
     ]).then(([VSSource, FSSource]) => {
+      if (this.isDisposed) return;
       const vertexShader = WebGLUtility.createShaderObject(
         gl,
         VSSource,
@@ -301,7 +301,7 @@ class App {
 
     // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
-      requestAnimationFrame(this.render);
+      this.animationFrameId = requestAnimationFrame(this.render);
     }
 
     // ビューポートの設定やクリア処理は毎フレーム呼び出す
@@ -318,5 +318,12 @@ class App {
 
     // ドローコール（描画命令）
     gl.drawArrays(gl.TRIANGLES, 0, this.position.length / this.positionStride);
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    this.stop();
+    cancelAnimationFrame(this.animationFrameId);
+    this.gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

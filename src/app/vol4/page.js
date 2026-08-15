@@ -1,27 +1,59 @@
 "use client";
-import { useEffect, useRef } from "react";
-import * as THREE from "@/lib/threeJs/three.module.js";
+import { useEffect } from "react";
+import {
+  BackSide,
+  Color,
+  FrontSide,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  PlaneGeometry,
+  Raycaster,
+  RepeatWrapping,
+  Scene,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+} from "@/lib/threeJs/three.module.js";
+
+const THREE = {
+  BackSide,
+  Color,
+  FrontSide,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  PlaneGeometry,
+  Raycaster,
+  RepeatWrapping,
+  Scene,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+};
 
 export default function Page() {
-  const initializedRef = useRef(false);
-
-  // ThreeAppの初期化とロードを行う関数
-  const initAndLoad = async (app) => {
-    await app.load();
-    app.init();
-    app.render();
-  };
-
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl");
-    if (wrapper && !initializedRef.current) {
-      const app = new ThreeApp(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new ThreeApp(wrapper, width, height);
+      app.load().then(() => {
+        if (!active) return;
+        app.init();
+        app.render();
+      });
     }
 
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -84,64 +116,58 @@ class ThreeApp {
     this.width = width;
     this.height = height;
     this.render = this.render.bind(this);
+    this.onClick = this.onClick.bind(this);
+    this.onKeyDown = this.onKeyDown.bind(this);
+    this.onResize = this.onResize.bind(this);
+    this.isDisposed = false;
 
     // Raycaster のインスタンスを生成
     this.rayCaster = new THREE.Raycaster();
 
     // マウスのクリックイベントの定義
-    window.addEventListener(
-      "click",
-      (mouseEvent) => {
-        if (this.isAnimating) return;
-        // スクリーン空間の座標系をレイキャスター用に正規化する（-1.0 ~ 1.0 の範囲）
-        const x = (mouseEvent.clientX / this.width) * 2.0 - 1.0;
-        const y = (mouseEvent.clientY / this.height) * 2.0 - 1.0;
-        // スクリーン空間は上下が反転している点に注意（Y だけ符号を反転させる）
-        const normalizedMouse = new THREE.Vector2(x, -y);
-        // レイキャスターに正規化済みマウス座標とカメラを指定する
-        this.rayCaster.setFromCamera(normalizedMouse, this.camera);
-        // scene に含まれるすべてのオブジェクト（ここでは Mesh）を対象にレイキャストする
-        const intersects = this.rayCaster.intersectObjects(
-          this.objectGroups.flatMap((group) => group.children)
-        );
-        if (intersects.length > 0) {
-          const selectedObject = intersects[0].object;
-          // サブグループ内のオブジェクトを探して一致するものを取得
-          const selectedGroup = this.objectGroups.find((group) =>
-            group.children.includes(selectedObject)
-          );
-          if (selectedGroup) {
-            this.animateRotation(selectedGroup);
-          }
-        }
-      },
-      false
-    );
+    window.addEventListener("click", this.onClick, false);
     // キーの押下や離す操作を検出できるようにする
-    window.addEventListener(
-      "keydown",
-      (keyEvent) => {
-        if (this.isAnimating) return;
-        switch (keyEvent.key) {
-          case " ":
-            this.animateRotation(this.objectGroups);
-            break;
-          default:
-        }
-      },
-      false
-    );
+    window.addEventListener("keydown", this.onKeyDown, false);
 
     // ウィンドウのリサイズを検出できるようにする
-    window.addEventListener(
-      "resize",
-      () => {
-        this.renderer.setSize(this.width, this.height);
-        this.camera.aspect = this.width / this.height;
-        this.camera.updateProjectionMatrix();
-      },
-      false
+    window.addEventListener("resize", this.onResize, false);
+  }
+
+  onClick(mouseEvent) {
+    if (this.isAnimating || !this.camera || !this.objectGroups) return;
+    const x = (mouseEvent.clientX / window.innerWidth) * 2.0 - 1.0;
+    const y = (mouseEvent.clientY / window.innerHeight) * 2.0 - 1.0;
+    const normalizedMouse = new THREE.Vector2(x, -y);
+    this.rayCaster.setFromCamera(normalizedMouse, this.camera);
+    const intersects = this.rayCaster.intersectObjects(
+      this.objectGroups.flatMap((group) => group.children)
     );
+    if (intersects.length === 0) return;
+    const selectedObject = intersects[0].object;
+    const selectedGroup = this.objectGroups.find((group) =>
+      group.children.includes(selectedObject)
+    );
+    if (selectedGroup) {
+      this.animateRotation(selectedGroup);
+    }
+  }
+
+  onKeyDown(keyEvent) {
+    if (!this.isAnimating && keyEvent.key === " " && this.objectGroups) {
+      this.animateRotation(this.objectGroups);
+    }
+  }
+
+  onResize() {
+    if (!this.renderer || !this.camera) return;
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.renderer.setSize(
+      this.width - ThreeApp.RENDERER_PARAM.rendererRatio,
+      this.height - ThreeApp.RENDERER_PARAM.rendererRatio
+    );
+    this.camera.aspect = this.width / this.height;
+    this.camera.updateProjectionMatrix();
   }
 
   /**
@@ -170,13 +196,17 @@ class ThreeApp {
 
         // アニメーションフレームごとに呼び出される関数
         const animate = (currentTime) => {
+          if (this.isDisposed) {
+            resolve();
+            return;
+          }
           const elapsedTime = currentTime - startTime; // 経過時間
           const progress = Math.min(elapsedTime / duration, 1); // アニメーションの進行度（0から1の範囲）
           object.rotation.y = initialRotation + progress * Math.PI; // 現在の回転角度を設定
 
           // アニメーションがまだ完了していない場合、次のフレームをリクエスト
           if (progress < 1) {
-            requestAnimationFrame(animate);
+            this.rotationFrameId = requestAnimationFrame(animate);
           } else {
             // アニメーションが完了した場合、Promiseを解決
             resolve();
@@ -184,7 +214,7 @@ class ThreeApp {
         };
 
         // 最初のアニメーションフレームをリクエスト
-        requestAnimationFrame(animate);
+        this.rotationFrameId = requestAnimationFrame(animate);
       });
     };
 
@@ -299,16 +329,24 @@ class ThreeApp {
     const promises = [];
 
     for (let i = 0; i < 15; i++) {
-      const frontTexturePath = `/vol4/light/${i}.jpg`;
-      const backTexturePath = `/vol4/flower/${i}.jpg`;
+      const frontTexturePath = `/vol4/light/${i}.webp`;
+      const backTexturePath = `/vol4/flower/${i}.webp`;
 
       promises.push(
         textureLoader.loadAsync(frontTexturePath).then((texture) => {
+          if (this.isDisposed) {
+            texture.dispose();
+            return;
+          }
           this.frontTextures[i] = texture;
         })
       );
       promises.push(
         textureLoader.loadAsync(backTexturePath).then((texture) => {
+          if (this.isDisposed) {
+            texture.dispose();
+            return;
+          }
           texture.wrapS = THREE.RepeatWrapping;
           texture.wrapT = THREE.RepeatWrapping;
           texture.repeat.set(-1, 1);
@@ -325,9 +363,22 @@ class ThreeApp {
    */
   render() {
     // 恒常ループ
-    requestAnimationFrame(this.render);
+    this.animationFrameId = requestAnimationFrame(this.render);
 
     // レンダラーで描画
     this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    cancelAnimationFrame(this.animationFrameId);
+    cancelAnimationFrame(this.rotationFrameId);
+    window.removeEventListener("click", this.onClick, false);
+    window.removeEventListener("keydown", this.onKeyDown, false);
+    window.removeEventListener("resize", this.onResize, false);
+    this.frontTextures?.forEach((texture) => texture?.dispose());
+    this.backTextures?.forEach((texture) => texture?.dispose());
+    this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
   }
 }

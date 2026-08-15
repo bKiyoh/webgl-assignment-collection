@@ -1,28 +1,28 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { WebGLUtility } from "@/lib/webGl/webgl.js";
 import { Vec3, Mat4 } from "@/lib/webGl/math";
 import { WebGLGeometry } from "@/lib/webGl/geometry.js";
 
 export default function Page() {
-  const initializedRef = useRef(false);
-  const initAndLoad = async (app) => {
-    app.init();
-    await app.load();
-    app.setupGeometry();
-    app.setupLocation();
-    // すべてのセットアップが完了したら描画を開始する
-    app.start();
-  };
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
     const wrapper = document.querySelector("#webgl-canvas");
-    if (wrapper && !initializedRef.current) {
-      const app = new App(wrapper, width, height);
-      initAndLoad(app);
-      initializedRef.current = true;
+    let app = null;
+    let active = true;
+    if (wrapper) {
+      app = new App(wrapper, width, height);
+      app.init();
+      app.load().then(() => {
+        if (!active) return;
+        app.setupGeometry();
+        app.setupLocation();
+        app.start();
+      });
     }
     return () => {
+      active = false;
+      app?.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -67,6 +67,7 @@ class App {
     this.height = height - App.RENDERER_PARAM.rendererRatio;
     this.resize = this.resize.bind(this);
     this.render = this.render.bind(this);
+    this.isDisposed = false;
   }
 
   /**
@@ -114,6 +115,8 @@ class App {
    * リサイズ処理
    */
   resize() {
+    this.width = window.innerWidth - App.RENDERER_PARAM.rendererRatio;
+    this.height = window.innerHeight - App.RENDERER_PARAM.rendererRatio;
     this.canvas.width = this.width;
     this.canvas.height = this.height;
   }
@@ -139,6 +142,7 @@ class App {
         "/vol7/sample2.jpg",
       ]),
     ]).then(([[VSSource, FSSource], [image, image1, image2]]) => {
+      if (this.isDisposed) return;
       const vertexShader = WebGLUtility.createShaderObject(
         gl,
         VSSource,
@@ -273,7 +277,7 @@ class App {
 
     // レンダリングのフラグの状態を見て、requestAnimationFrame を呼ぶか決める
     if (this.isRendering === true) {
-      requestAnimationFrame(this.render);
+      this.animationFrameId = requestAnimationFrame(this.render);
     }
 
     // 現在までの経過時間
@@ -343,5 +347,13 @@ class App {
         0
       );
     }
+  }
+
+  dispose() {
+    this.isDisposed = true;
+    this.stop();
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("resize", this.resize, false);
+    this.gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

@@ -1,6 +1,26 @@
 "use client";
 import { useEffect } from "react";
-import * as THREE from "@/lib/threeJs/three.module.js";
+import {
+  CapsuleGeometry,
+  CylinderGeometry,
+  ExtrudeGeometry,
+  Group,
+  HalfFloatType,
+  Mesh,
+  MeshToonMaterial,
+  OrthographicCamera,
+  PerspectiveCamera,
+  PlaneGeometry,
+  Scene,
+  ShaderMaterial,
+  Shape,
+  Texture,
+  UniformsUtils,
+  Vector3,
+  Vector4,
+  WebGLRenderer,
+  WebGLRenderTarget,
+} from "@/lib/threeJs/three.module.js";
 import { OrbitControls } from "@/lib/threeJs/OrbitControls.js";
 import {
   GodRaysFakeSunShader,
@@ -9,6 +29,28 @@ import {
   GodRaysGenerateShader,
 } from "@/lib/threeJs/GodRaysShader.js";
 
+const THREE = {
+  CapsuleGeometry,
+  CylinderGeometry,
+  ExtrudeGeometry,
+  Group,
+  HalfFloatType,
+  Mesh,
+  MeshToonMaterial,
+  OrthographicCamera,
+  PerspectiveCamera,
+  PlaneGeometry,
+  Scene,
+  ShaderMaterial,
+  Shape,
+  Texture,
+  UniformsUtils,
+  Vector3,
+  Vector4,
+  WebGLRenderer,
+  WebGLRenderTarget,
+};
+
 export default function Page() {
   useEffect(() => {
     const { innerHeight: height, innerWidth: width } = window;
@@ -16,6 +58,7 @@ export default function Page() {
     const app = new ThreeApp(wrapper, width, height);
     app.render();
     return () => {
+      app.dispose();
       if (wrapper) {
         while (wrapper.firstChild) {
           wrapper.removeChild(wrapper.firstChild);
@@ -84,6 +127,8 @@ class ThreeApp {
     this.clipPosition = new THREE.Vector4(); // クリップ空間の位置
     this.screenSpacePosition = new THREE.Vector3(); // スクリーンスペースの位置
     this.postprocessing = { enabled: true }; // ポストプロセッシング
+    this.onWindowResize = this.onWindowResize.bind(this);
+    this.animate = this.animate.bind(this);
     this.rotationDirection = 1; // 初期の回転方向
     this.material = null; // マテリアル
     this.swingGroup = null; // 首振りグループ
@@ -187,7 +232,7 @@ class ThreeApp {
     this.controls.minDistance = 50;
     this.controls.maxDistance = 500;
 
-    window.addEventListener("resize", () => this.onWindowResize());
+    window.addEventListener("resize", this.onWindowResize);
 
     this.initPostprocessing(this.width, this.height);
   }
@@ -368,7 +413,7 @@ class ThreeApp {
 
   // アニメーション
   animate() {
-    requestAnimationFrame(() => this.animate());
+    this.animationFrameId = requestAnimationFrame(this.animate);
     this.controls.update();
 
     // 羽を回転
@@ -549,5 +594,19 @@ class ThreeApp {
       this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  dispose() {
+    cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener("resize", this.onWindowResize);
+    this.controls.dispose();
+    Object.values(this.postprocessing).forEach((resource) => {
+      if (resource && typeof resource.dispose === "function") {
+        resource.dispose();
+      }
+    });
+    this.material.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 }
