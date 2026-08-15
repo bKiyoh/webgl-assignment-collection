@@ -334,7 +334,7 @@ class ThreeApp {
     );
     window.addEventListener(
       "keyup",
-      (keyEvent) => {
+      () => {
         // なんらかのキーが離された操作で無条件にフラグを下ろす
         this.isDown = false;
       },
