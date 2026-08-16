@@ -3,10 +3,27 @@
 このサイトは[WebGL スクール第１１期](https://webgl.souhonzan.org/entry/?v=2635)の課題作品ポートフォリオになります。
 
 ### 使用技術一覧
-- Next.js
-- shadcn/ui
+- Vue 3
+- Vite
+- Vue Router
+- Vuetify
 - Three.js
 - WebGL
+
+### ローカル開発
+
+```bash
+npm install
+npm run dev
+```
+
+### 検証
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
 
 ### URL
 [https://webgl-collection-sigma.vercel.app/](https://webgl-collection-sigma.vercel.app/)
@@ -48,5 +65,4 @@
   - ノイズディストーションを利用して空を表現しました。
 １パス目の球体自体に対してノイズディストーション、２パス目でパネル全体とマウスポインタの座標にそれぞれノイズディストーションをかけてます。
   
-
 
