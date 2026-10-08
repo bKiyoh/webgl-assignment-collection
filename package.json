@@ -14,7 +14,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "vue": "^3.5.41",
+    "vue": "^3.5.43",
     "vue-router": "^5.2.0",
     "vuetify": "^4.1.9"
   },
